@@ -1,0 +1,20 @@
+version: "3"
+services:
+  trek_server:
+    container_name: trekapi
+    build: .
+    env_file:
+      - .env
+    command: "venv/bin/uvicorn trek.main:app --host 0.0.0.0 --port 5005"
+    ports:
+      - "5005:5005"
+    networks:
+      # - trekapi_network
+      - nginx_network
+    restart: always
+
+networks:
+  nginx_network:
+    external:
+      name: nginx_default
+  # trekapi_network: ~
