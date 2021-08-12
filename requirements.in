@@ -4,3 +4,9 @@ python-dotenv
 geopy
 httpx
 pydantic
+pendulum
+aiosql
+migra[pg]
+sqlbag
+databases[postgresql]
+contextlib2

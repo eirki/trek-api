@@ -5,16 +5,29 @@ services:
     build: .
     env_file:
       - .env
-    command: "venv/bin/uvicorn trek.main:app --host 0.0.0.0 --port 5005"
+    command: "venv/bin/uvicorn trek.main:app --host 0.0.0.0 --port 5007"
     ports:
-      - "5005:5005"
+      - "5007:5007"
     networks:
-      # - trekapi_network
+      - trekapi_network
       - nginx_network
+    restart: always
+  trekapi_db:
+    container_name: trekapi_db
+    image: "postgres:13.3"
+    env_file: .env
+    expose:
+      - 5432
+    ports:
+      - 5432:5432
+    volumes:
+      - ~/trekapi-data:/var/lib/postgresql/data
+    networks:
+      - trekapi_network
     restart: always
 
 networks:
   nginx_network:
     external:
       name: nginx_default
-  # trekapi_network: ~
+  trekapi_network: ~

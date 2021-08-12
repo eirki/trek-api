@@ -8,3 +8,10 @@ isort
 mypy
 pre-commit
 relint
+ward
+coverage
+async-asgi-testclient
+urllib3
+requests
+testcontainers[postgresql]
+nest-asyncio

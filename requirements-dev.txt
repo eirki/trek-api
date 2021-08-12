@@ -6,24 +6,51 @@
 #
 appdirs==1.4.4
     # via black
+async-asgi-testclient==1.4.6
+    # via -r requirements-dev.in
 backcall==0.2.0
     # via ipython
 backports.entry-points-selectable==1.1.0
     # via virtualenv
 black==21.7b0
     # via -r requirements-dev.in
+certifi==2021.5.30
+    # via
+    #   -c requirements.txt
+    #   requests
 cfgv==3.3.0
     # via pre-commit
+charset-normalizer==2.0.4
+    # via requests
 click==8.0.1
     # via
     #   -c requirements.txt
     #   black
+    #   click-completion
+    #   click-default-group
+    #   ward
+click-completion==0.5.2
+    # via ward
+click-default-group==1.2.2
+    # via ward
+colorama==0.4.4
+    # via rich
+commonmark==0.9.1
+    # via rich
+coverage==5.5
+    # via -r requirements-dev.in
+cucumber-tag-expressions==2.0.4
+    # via ward
 debugpy==1.4.1
     # via ipykernel
 decorator==5.0.9
     # via ipython
+deprecation==2.1.0
+    # via testcontainers
 distlib==0.3.2
     # via virtualenv
+docker==5.0.0
+    # via testcontainers
 filelock==3.0.12
     # via virtualenv
 flake8==3.9.2
@@ -37,6 +64,10 @@ flake8-print==4.0.0
     # via -r requirements-dev.in
 identify==2.2.11
     # via pre-commit
+idna==3.2
+    # via
+    #   -c requirements.txt
+    #   requests
 ipykernel==6.0.3
     # via -r requirements-dev.in
 ipython==7.26.0
@@ -47,24 +78,36 @@ isort==5.9.3
     # via -r requirements-dev.in
 jedi==0.18.0
     # via ipython
+jinja2==3.0.1
+    # via click-completion
 jupyter-client==6.1.12
     # via ipykernel
 jupyter-core==4.7.1
     # via jupyter-client
+markupsafe==2.0.1
+    # via jinja2
 matplotlib-inline==0.1.2
     # via
     #   ipykernel
     #   ipython
 mccabe==0.6.1
     # via flake8
+multidict==5.1.0
+    # via async-asgi-testclient
 mypy==0.910
     # via -r requirements-dev.in
 mypy-extensions==0.4.3
     # via
     #   black
     #   mypy
+nest-asyncio==1.5.1
+    # via -r requirements-dev.in
 nodeenv==1.6.0
     # via pre-commit
+packaging==21.0
+    # via
+    #   -c requirements.txt
+    #   deprecation
 parso==0.8.2
     # via jedi
 pathspec==0.9.0
@@ -75,10 +118,18 @@ pickleshare==0.7.5
     # via ipython
 platformdirs==2.2.0
     # via virtualenv
+pluggy==0.13.1
+    # via ward
+pprintpp==0.4.0
+    # via ward
 pre-commit==2.13.0
     # via -r requirements-dev.in
 prompt-toolkit==3.0.19
     # via ipython
+psycopg2-binary==2.9.1
+    # via
+    #   -c requirements.txt
+    #   testcontainers
 ptyprocess==0.7.0
     # via pexpect
 pycodestyle==2.7.0
@@ -89,9 +140,17 @@ pycodestyle==2.7.0
 pyflakes==2.3.1
     # via flake8
 pygments==2.9.0
-    # via ipython
+    # via
+    #   ipython
+    #   rich
+pyparsing==2.4.7
+    # via
+    #   -c requirements.txt
+    #   packaging
 python-dateutil==2.8.2
-    # via jupyter-client
+    # via
+    #   -c requirements.txt
+    #   jupyter-client
 pyyaml==5.4.1
     # via
     #   pre-commit
@@ -102,18 +161,37 @@ regex==2021.8.3
     # via black
 relint==1.2.1
     # via -r requirements-dev.in
+requests==2.26.0
+    # via
+    #   -r requirements-dev.in
+    #   async-asgi-testclient
+    #   docker
+rich==10.7.0
+    # via ward
+shellingham==1.4.0
+    # via click-completion
 six==1.16.0
     # via
+    #   -c requirements.txt
+    #   click-completion
     #   flake8-debugger
     #   flake8-print
     #   python-dateutil
     #   virtualenv
+sqlalchemy==1.3.24
+    # via
+    #   -c requirements.txt
+    #   testcontainers
+testcontainers[postgresql]==3.4.1
+    # via -r requirements-dev.in
 toml==0.10.2
     # via
     #   mypy
     #   pre-commit
 tomli==1.2.0
-    # via black
+    # via
+    #   black
+    #   ward
 tornado==6.1
     # via
     #   ipykernel
@@ -129,10 +207,20 @@ typing-extensions==3.10.0.0
     # via
     #   -c requirements.txt
     #   mypy
+urllib3==1.26.6
+    # via
+    #   -r requirements-dev.in
+    #   requests
 virtualenv==20.7.0
     # via pre-commit
+ward==0.63.0b0
+    # via -r requirements-dev.in
 wcwidth==0.2.5
     # via prompt-toolkit
+websocket-client==1.1.1
+    # via docker
+wrapt==1.12.1
+    # via testcontainers
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools

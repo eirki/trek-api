@@ -1,0 +1,6 @@
+import IPython
+import nest_asyncio
+
+nest_asyncio.apply()
+
+alias ipy IPython.embed(colors="Linux", confirm_exit=False, display_banner=False, using="asyncio")
