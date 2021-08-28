@@ -5,17 +5,15 @@ import sys
 
 from fastapi import FastAPI
 
-from trek import location, logging_conf, route, trek
+from trek import crud, location, logging_conf, route
 from trek.database import database
-
-# from starlette.exceptions import HTTPException as StarletteHTTPException
 
 log = logging.getLogger(__name__)
 
 app = FastAPI()
 app.include_router(location.router)
 app.include_router(route.router)
-app.include_router(trek.router)
+app.include_router(crud.router)
 DEBUG_MODE = "--reload" in sys.argv
 TESTING = sys.argv[0].endswith("ward/__main__.py")
 
@@ -38,9 +36,3 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     await database.disconnect()
-
-
-# @app.exception_handler(StarletteHTTPException)
-# async def http_exception_handler(request, exc):
-#     print(exc)
-#     1 / 0

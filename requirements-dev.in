@@ -15,3 +15,5 @@ urllib3
 requests
 testcontainers[postgresql]
 nest-asyncio
+freezegun
+types-freezegun

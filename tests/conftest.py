@@ -5,28 +5,46 @@ from databases import Database
 from testcontainers.postgres import PostgresContainer
 from ward import fixture
 
-from trek import main, trek, user
+from trek import crud, main, user
 from trek.database import get_db
 
 client = TestClient(main.app)
 
 
-@fixture
-async def connect_db():
+@fixture(scope="global")
+async def setup_db():
     with PostgresContainer(image="postgres:13.3") as postgres:
         db_test_uri = postgres.get_connection_url().replace("+psycopg2", "")
         test_database = Database(db_test_uri, force_rollback=True)
 
         await test_database.connect()
-        async with test_database.transaction():
+        async with test_database.transaction(force_rollback=True):
             await user.queries.create_schema(test_database)
-            await trek.queries.create_schema(test_database)
-
-            async def get_test_db() -> t.AsyncIterator[Database]:
-                async with test_database.transaction():
-                    yield test_database
-
-            main.app.dependency_overrides[get_db] = get_test_db
-
+            await crud.queries.create_schema(test_database)
             yield test_database
-            await test_database.disconnect()
+
+        await test_database.disconnect()
+
+
+@fixture
+async def connect_db(db=setup_db):
+    async with db.transaction(force_rollback=True):
+
+        async def get_test_db() -> t.AsyncIterator[Database]:
+            yield db  # yield to endpoint
+
+        main.app.dependency_overrides[get_db] = get_test_db
+        yield db  # yield to test
+
+    await reset_sequences(db)
+
+
+async def reset_sequences(db):
+    async with db.transaction():
+        sequences = await db.fetch_all(
+            query="SELECT * FROM information_schema.sequences"
+        )
+        for seq in sequences:
+            await db.execute(
+                query=f"ALTER SEQUENCE {seq['sequence_name']} RESTART WITH 1"
+            )
