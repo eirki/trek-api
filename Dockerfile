@@ -10,5 +10,6 @@ USER appuser
 RUN python -m venv venv && venv/bin/pip install --upgrade pip && venv/bin/pip install -r /tmp/requirements.txt
 
 COPY trek ./trek
+COPY sql ./sql
 
 CMD ["venv/bin/uvicorn", "trek.main:app"]
