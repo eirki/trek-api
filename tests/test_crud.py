@@ -5,7 +5,7 @@ from freezegun import freeze_time
 import pendulum
 from ward import fixture, test
 
-from tests.conftest import client, connect_db
+from tests.conftest import all_rows_in_table, client, connect_db
 from trek import crud
 
 
@@ -13,12 +13,6 @@ from trek import crud
 def freeze():
     with freeze_time("2012-01-14"):
         yield
-
-
-async def all_rows_in_table(db, table: str):
-    records = await db.fetch_all(f"select * from {table}")
-    as_dict = [dict(record) for record in records]
-    return as_dict
 
 
 def example_waypoints(trek_id: int, leg_id: int) -> list[dict]:
@@ -58,9 +52,9 @@ def example_waypoints(trek_id: int, leg_id: int) -> list[dict]:
     ]
 
 
-async def preadd_users(db: Database) -> list[int]:
+async def _preadd_users(db: Database) -> list[int]:
     sql = """insert into
-            user_ (name)
+            user_ (name_)
         values
             (:name);
         """
@@ -75,8 +69,8 @@ async def preadd_users(db: Database) -> list[int]:
     return as_int
 
 
-async def preadd_treks(db: Database, user_ids: list[int]) -> int:
-    user_ids = await preadd_users(db)
+async def _preadd_treks(db: Database, user_ids: list[int]) -> int:
+    user_ids = await _preadd_users(db)
     trek_record = await crud.queries.add_trek(db, origin="testOrigin")
     trek_id = trek_record["id"]
     leg_record = await crud.queries.add_leg(
@@ -107,7 +101,7 @@ async def preadd_treks(db: Database, user_ids: list[int]) -> int:
 
 @test("test_add ")
 async def test_add(db=connect_db, _=freeze):
-    user_ids = await preadd_users(db)
+    user_ids = await _preadd_users(db)
     response = await client.post(
         "/trek/",
         json={
@@ -133,8 +127,8 @@ async def test_add(db=connect_db, _=freeze):
 
 @test("test_add_leg")
 async def test_add_leg(db=connect_db, _=freeze):
-    user_ids = await preadd_users(db)
-    trek_id = await preadd_treks(db, user_ids)
+    user_ids = await _preadd_users(db)
+    trek_id = await _preadd_treks(db, user_ids)
     response = await client.post(
         f"/trek/{trek_id}",
         json={
@@ -185,8 +179,8 @@ async def test_add_leg(db=connect_db, _=freeze):
 
 @test("test_get")
 async def test_get(db=connect_db):
-    user_ids = await preadd_users(db)
-    trek_id = await preadd_treks(db, user_ids)
+    user_ids = await _preadd_users(db)
+    trek_id = await _preadd_treks(db, user_ids)
 
     response = await client.get(f"/trek/{trek_id}")
     res = response.json()
@@ -204,8 +198,8 @@ async def test_get(db=connect_db):
 
 @test("test_delete")
 async def test_delete(db=connect_db):
-    user_ids = await preadd_users(db)
-    trek_id = await preadd_treks(db, user_ids)
+    user_ids = await _preadd_users(db)
+    trek_id = await _preadd_treks(db, user_ids)
     response = await client.delete(f"/trek/{trek_id}")
     assert response.status_code == 200
     res = await all_rows_in_table(db, "leg")

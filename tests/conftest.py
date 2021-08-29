@@ -48,3 +48,9 @@ async def reset_sequences(db):
             await db.execute(
                 query=f"ALTER SEQUENCE {seq['sequence_name']} RESTART WITH 1"
             )
+
+
+async def all_rows_in_table(db, table: str):
+    records = await db.fetch_all(f"select * from {table}")
+    as_dict = [dict(record) for record in records]
+    return as_dict

@@ -6,6 +6,8 @@ from databases import Database
 from trek import env
 
 database = Database(env.db_uri)
+# TODO replace Database with raw asyncpg
+# TODO handle migration with migra
 
 
 def split_query(query: str) -> list[str]:
@@ -24,9 +26,11 @@ class DatabasesAdapter:
     def process_sql(self, query_name, _op_type, sql):
         return sql
 
-    async def select(self, conn, query_name, sql, parameters):
-        record = await conn.fetch_all(query=sql, values=parameters)
-        return record._row if record is not None else None
+    async def select(self, conn, query_name, sql, parameters, record_class=None):
+        if not parameters:
+            parameters = {}
+        records = await conn.fetch_all(query=sql, values=parameters)
+        return [record._row for record in records] if records is not None else None
 
     async def select_one(self, conn, query_name, sql, parameters, record_class=None):
         record = await conn.fetch_one(query=sql, values=parameters)

@@ -5,7 +5,7 @@ import sys
 
 from fastapi import FastAPI
 
-from trek import crud, location, logging_conf, route
+from trek import crud, location, logging_conf, route, user
 from trek.database import database
 
 log = logging.getLogger(__name__)
@@ -14,6 +14,7 @@ app = FastAPI()
 app.include_router(location.router)
 app.include_router(route.router)
 app.include_router(crud.router)
+app.include_router(user.router)
 DEBUG_MODE = "--reload" in sys.argv
 TESTING = sys.argv[0].endswith("ward/__main__.py")
 
@@ -27,7 +28,7 @@ async def startup_event():
 async def startup():
     try:
         await database.connect()
-    except ConnectionRefusedError:
+    except Exception:
         if not DEBUG_MODE:
             raise
         log.warn("No database connection")
