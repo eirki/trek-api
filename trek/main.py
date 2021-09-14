@@ -5,14 +5,12 @@ import sys
 
 from fastapi import FastAPI
 
-from trek import crud, location, logging_conf, route, user
-from trek.database import database
+from trek import crud, database, logging_conf, search, user
 
 log = logging.getLogger(__name__)
 
 app = FastAPI()
-app.include_router(location.router)
-app.include_router(route.router)
+app.include_router(search.router)
 app.include_router(crud.router)
 app.include_router(user.router)
 DEBUG_MODE = "--reload" in sys.argv
