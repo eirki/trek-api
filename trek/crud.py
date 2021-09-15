@@ -5,6 +5,7 @@ import logging
 import aiosql
 from databases import Database
 from fastapi import APIRouter, Depends
+from fastapi_jwt_auth import AuthJWT
 from geopy.distance import distance
 import pendulum
 from pydantic import BaseModel, Field
@@ -22,7 +23,12 @@ class AddRequest(BaseModel):
 
 
 @router.post("/")
-async def add_trek(request: AddRequest, db: Database = Depends(get_db)):
+async def add_trek(
+    request: AddRequest,
+    db: Database = Depends(get_db),
+    Authorize: AuthJWT = Depends(),
+):
+    Authorize.jwt_required()
     trek_record = await queries.add_trek(db, origin=request.origin)
     trek_id = trek_record["id"]
     users_in = [{"trek_id": trek_id, "user_id": user_id} for user_id in request.users]
@@ -40,7 +46,12 @@ class GetResponse(BaseModel):
 
 
 @router.get("/{trek_id}", response_model=GetResponse)
-async def get_trek(trek_id: int, db: Database = Depends(get_db)):
+async def get_trek(
+    trek_id: int,
+    db: Database = Depends(get_db),
+    Authorize: AuthJWT = Depends(),
+):
+    Authorize.jwt_required()
     trek_data = await queries.get_trek(db, trek_id=trek_id)
     record = GetResponse(**trek_data)
     return record
@@ -61,7 +72,13 @@ class ExtendRequest(BaseModel):
 
 
 @router.post("/{trek_id}")
-async def add_leg(trek_id: int, request: ExtendRequest, db: Database = Depends(get_db)):
+async def add_leg(
+    trek_id: int,
+    request: ExtendRequest,
+    db: Database = Depends(get_db),
+    Authorize: AuthJWT = Depends(),
+):
+    Authorize.jwt_required()
     leg_record = await queries.add_leg(
         db,
         trek_id=trek_id,
@@ -108,5 +125,10 @@ def waypoint_tuple_to_dicts(
 
 
 @router.delete("/{trek_id}")
-async def delete_trek(trek_id: int, db: Database = Depends(get_db)):
+async def delete_trek(
+    trek_id: int,
+    db: Database = Depends(get_db),
+    Authorize: AuthJWT = Depends(),
+):
+    Authorize.jwt_required()
     await queries.delete_trek(db, trek_id=trek_id)

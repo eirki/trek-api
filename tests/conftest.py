@@ -5,8 +5,9 @@ from databases import Database
 from testcontainers.postgres import PostgresContainer
 from ward import fixture
 
-from trek import crud, main, user
+from trek import crud, database, main, user
 from trek.database import get_db
+from trek.trackers import _tracker_utils
 
 client = TestClient(main.app)
 
@@ -18,9 +19,13 @@ async def setup_db():
         test_database = Database(db_test_uri, force_rollback=True)
 
         await test_database.connect()
+        await database.register_json_conversion(
+            test_database.connection().raw_connection
+        )
         async with test_database.transaction(force_rollback=True):
             await user.queries.create_schema(test_database)
             await crud.queries.create_schema(test_database)
+            await _tracker_utils.queries.create_schema(test_database)
             yield test_database
 
         await test_database.disconnect()

@@ -8,4 +8,9 @@ migra[pg]
 sqlbag
 databases[postgresql]
 contextlib2
+fitbit
+withings-api
+python-jose[cryptography]
 openrouteservice
+fastapi-jwt-auth
+geopy

@@ -17,3 +17,19 @@ db_host: Final = os.environ["POSTGRES_HOST"]
 db_port: Final = os.environ["POSTGRES_PORT"]
 db_uri: Final = f"postgres://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
+schema_db_name: Final = "trek_schema_db"
+schema_db_uri: Final = (
+    f"postgres://{db_user}:{db_password}@{db_host}:{db_port}/{schema_db_name}"
+)
+
+fitbit_client_id = os.environ["trek_fitbit_client_id"]
+fitbit_client_secret = os.environ["trek_fitbit_client_secret"]
+fitbit_redirect_uri = os.environ["trek_fitbit_redirect_url"]
+
+withings_client_id = os.environ["trek_withings_client_id"]
+withings_consumer_secret = os.environ["trek_withings_consumer_secret"]
+withings_redirect_uri = os.environ["trek_withings_redirect_uri"]
+
+jwt_secret_key: Final = os.environ["trek_jwt_secret_key"]
+
+ors_key: Final = os.environ["trek_ors_key"]

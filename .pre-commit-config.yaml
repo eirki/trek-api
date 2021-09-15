@@ -40,5 +40,5 @@ repos:
       - id: pip-compile
         name: pip-compile
         entry: pip-compile
-        files: ^requirements\.(in|txt)$
+        files: ^requirements.in$
         language: system

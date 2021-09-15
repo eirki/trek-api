@@ -1,9 +1,10 @@
 import datetime as dt
 
+from asyncpg.exceptions import UniqueViolationError
 from databases import Database
 from freezegun import freeze_time
 import pendulum
-from ward import fixture, test
+from ward import fixture, raises, test
 
 from tests.conftest import all_rows_in_table, client, connect_db
 from trek import crud
@@ -219,3 +220,28 @@ async def test_delete(db=connect_db):
     res = await all_rows_in_table(db, "trek")
     exp = [{"id": 2, "origin": "testOrigin2"}]
     assert res == exp
+
+
+@test("test_two_ongoing_legs_fail")
+async def test_two_ongoing_legs_fail(db=connect_db):
+    await _preadd_users(db)
+    trek_record = await crud.queries.add_trek(db, origin="testOrigin")
+    trek_id = trek_record["id"]
+    leg_record = await crud.queries.add_leg(
+        db,
+        trek_id=trek_id,
+        destination="testDestination",
+        added_at=pendulum.datetime(2015, 2, 5, 12, 30, 5),
+    )
+    leg_id = leg_record["id"]
+    await crud.queries.start_leg(db, id=leg_id)
+
+    leg_record = await crud.queries.add_leg(
+        db,
+        trek_id=trek_id,
+        destination="testDestination2",
+        added_at=pendulum.datetime(2015, 2, 5, 12, 30, 5),
+    )
+    leg_id = leg_record["id"]
+    with raises(UniqueViolationError):
+        await crud.queries.start_leg(db, id=leg_id)

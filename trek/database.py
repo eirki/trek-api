@@ -1,13 +1,26 @@
 from __future__ import annotations
 
+import json
+import logging
+
 from contextlib2 import asynccontextmanager
 from databases import Database
 
-from trek import env
+from trek import config
 
-database = Database(env.db_uri)
-# TODO replace Database with raw asyncpg
-# TODO handle migration with migra
+log = logging.getLogger(__name__)
+
+
+database_pool = Database(config.db_uri)
+
+
+async def register_json_conversion(conn):
+    await conn.set_type_codec(
+        "json",
+        encoder=json.dumps,
+        decoder=json.loads,
+        schema="pg_catalog",
+    )
 
 
 def split_query(query: str) -> list[str]:
@@ -17,7 +30,7 @@ def split_query(query: str) -> list[str]:
 
 
 def get_db() -> Database:
-    return database
+    return database_pool
 
 
 class DatabasesAdapter:
