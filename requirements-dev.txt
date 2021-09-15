@@ -21,7 +21,9 @@ certifi==2021.5.30
 cfgv==3.3.0
     # via pre-commit
 charset-normalizer==2.0.4
-    # via requests
+    # via
+    #   -c requirements.txt
+    #   requests
 click==8.0.1
     # via
     #   -c requirements.txt
@@ -166,6 +168,7 @@ relint==1.2.1
     # via -r requirements-dev.in
 requests==2.26.0
     # via
+    #   -c requirements.txt
     #   -r requirements-dev.in
     #   async-asgi-testclient
     #   docker
@@ -214,6 +217,7 @@ typing-extensions==3.10.0.0
     #   mypy
 urllib3==1.26.6
     # via
+    #   -c requirements.txt
     #   -r requirements-dev.in
     #   requests
 virtualenv==20.7.0

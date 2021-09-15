@@ -17,10 +17,10 @@ if [[ $? != 0 ]]; then
   exit 1
 fi
 
-# make test
-# if [[ $? != 0 ]]; then
-#   exit 1
-# fi
+make test
+if [[ $? != 0 ]]; then
+  exit 1
+fi
 
 echo
 echo "Deploying"
@@ -29,4 +29,4 @@ docker-compose up -d
 
 echo
 echo "Pushing"
-git push --no-verify && git push --no-verify
+git push --no-verify

@@ -14,7 +14,11 @@ create table leg (
 );
 
 
---TODO: add constrain only ongoing leg per trek
+create unique index leg_unq_ix_trek_id_is_ongoing on leg (trek_id)
+where
+    is_ongoing;
+
+
 create table waypoint (
     id serial primary key,
     trek_id smallint not null references trek(id),
@@ -24,6 +28,9 @@ create table waypoint (
     elevation float,
     distance float not null
 );
+
+
+create index waypoint_ix_distance on waypoint (distance);
 
 
 create table trek_user (
