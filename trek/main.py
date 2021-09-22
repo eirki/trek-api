@@ -10,7 +10,7 @@ from fastapi_jwt_auth import AuthJWT
 from fastapi_jwt_auth.exceptions import AuthJWTException
 from pydantic import BaseModel
 
-from trek import config, crud, database, logging_conf, search, user
+from trek import config, crud, database, frontend, logging_conf, search, user
 
 log = logging.getLogger(__name__)
 
@@ -18,6 +18,8 @@ app = FastAPI()
 app.include_router(search.router)
 app.include_router(crud.router)
 app.include_router(user.router)
+app.include_router(frontend.router)
+
 DEBUG_MODE = "--reload" in sys.argv
 TESTING = sys.argv[0].endswith("ward/__main__.py")
 

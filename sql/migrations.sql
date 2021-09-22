@@ -1,14 +1,14 @@
 -- name: migrations#
 create table user_ (
     id serial primary key,
-    tracker_user_id text not null,
     is_admin boolean not null default false
 );
 
 
 create table trek (
     id serial primary key,
-    origin text not null
+    origin text not null,
+    owner_id int references user_(id)
 );
 
 
@@ -52,7 +52,8 @@ create type tracker_type as enum ('fitbit', 'withings');
 create table user_token (
     token json not null,
     user_id_ smallint not null references user_(id),
-    tracker tracker_type not null
+    tracker tracker_type not null,
+    tracker_user_id text unique not null
 );
 
 

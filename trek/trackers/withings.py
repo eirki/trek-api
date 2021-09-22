@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from functools import partial
 import typing as t
 
 from databases import Database
@@ -41,37 +40,23 @@ class WithingsService:
         url = self.client.get_authorize_url()
         return url
 
-    def token(self, code: str) -> tuple[str, WithingsToken]:
+    def token(self, code: str) -> WithingsToken:
         credentials = self.client.get_credentials(code)
-        token = WithingsToken(
-            userid=credentials.userid,
-            access_token=credentials.access_token,
-            refresh_token=credentials.refresh_token,
-            expires_at=credentials.token_expiry,
-        )
-        return str(credentials.userid), token
+        token = self.prepare_token(credentials)
+        return token
 
     @staticmethod
-    async def persist_token(db: Database, user_id: int, token: WithingsToken) -> None:
-        async with db.transaction():
-            await queries.persist_token(
-                db,
-                token=token,
-                user_id_=user_id,
-                tracker="withings",
-            )
-
-    @classmethod
-    def _sync_persist_credentials(
-        cls, db: Database, user_id: int, credentials: Credentials
-    ) -> None:
-        token = WithingsToken(
-            userid=credentials.userid,
-            access_token=credentials.access_token,
-            refresh_token=credentials.refresh_token,
-            expires_at=credentials.token_expiry,
+    def prepare_token(token: Credentials) -> WithingsToken:
+        return WithingsToken(
+            userid=token.userid,
+            access_token=token.access_token,
+            refresh_token=token.refresh_token,
+            expires_at=token.token_expiry,
         )
-        asyncio.run(cls.persist_token(db, user_id, token))
+
+    @staticmethod
+    def tracker_user_id_from_token(token: WithingsToken) -> str:
+        return "withings_" + str(token["userid"])
 
 
 class WithingsUser:
@@ -83,6 +68,7 @@ class WithingsUser:
         user_id: int,
         token: WithingsToken,
     ):
+        self.db = db
         self.user_id = user_id
         credentials = Credentials(
             userid=token["userid"],
@@ -94,11 +80,24 @@ class WithingsUser:
             token_type="Bearer",
         )
         self.client: WithingsApi = WithingsApi(
-            credentials,
-            refresh_cb=partial(
-                self.service._sync_persist_credentials, db=db, user_id=user_id
-            ),
+            credentials, refresh_cb=self._persist_token_callback
         )
+
+    async def persist_token(self, token: WithingsToken) -> None:
+        tracker_user_id = self.service.tracker_user_id_from_token(token)
+        async with self.db.transaction():
+            await queries.persist_token(
+                self.db,
+                token=token,
+                user_id_=self.user_id,
+                tracker="withings",
+                tracker_user_id=tracker_user_id,
+            )
+
+    def _persist_token_callback(self, credentials: Credentials) -> None:
+        print("withings callback")
+        token = self.service.prepare_token(credentials)
+        asyncio.run(self.persist_token(token))
 
     def _steps_api_call(self, date: pendulum.Date) -> MeasureGetActivityResponse:
         return self.client.measure_get_activity(

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from functools import partial
 import logging
 import typing as t
 
@@ -41,26 +40,18 @@ class FitbitService:
         url, _ = self.client.authorize_token_url(scope=scope)
         return url
 
-    def token(self, code: str) -> tuple[str, FitbitToken]:
+    def token(self, code: str) -> FitbitToken:
         self.client.fetch_access_token(code)
-        token = self.client.session.token
-        return token["user_id"], token
+        token = self.prepare_token(self.client.session.token)
+        return token
 
     @staticmethod
-    async def persist_token(db: Database, user_id: int, token: FitbitToken) -> None:
-        async with db.transaction():
-            await queries.persist_token(
-                db,
-                token=token,
-                user_id_=user_id,
-                tracker="fitbit",
-            )
+    def prepare_token(token) -> FitbitToken:
+        return dict(token)
 
-    @classmethod
-    def _sync_persist_token(
-        cls, db: Database, user_id: int, token: FitbitToken
-    ) -> None:
-        asyncio.run(cls.persist_token(db, user_id, token))
+    @staticmethod
+    def tracker_user_id_from_token(token: FitbitToken) -> str:
+        return "fitbit_" + str(token["user_id"])
 
 
 class FitbitUser:
@@ -72,6 +63,7 @@ class FitbitUser:
         user_id: int,
         token: FitbitToken,
     ):
+        self.db = db
         self.user_id = user_id
         self.client = FitbitApi(
             config.fitbit_client_id,
@@ -79,11 +71,25 @@ class FitbitUser:
             access_token=token["access_token"],
             refresh_token=token["refresh_token"],
             expires_at=token["expires_at"],
-            refresh_cb=partial(
-                self.service._sync_persist_token, db=db, user_id=user_id
-            ),
+            refresh_cb=self._persist_token_callback,
             system=FitbitApi.METRIC,
         )
+
+    async def persist_token(self, token: FitbitToken) -> None:
+        tracker_user_id = self.service.tracker_user_id_from_token(token)
+        async with self.db.transaction():
+            await queries.persist_token(
+                self.db,
+                token=token,
+                user_id_=self.user_id,
+                tracker="fitbit",
+                tracker_user_id=tracker_user_id,
+            )
+
+    def _persist_token_callback(self, token: FitbitToken) -> None:
+        print("fitbit callback")
+        token = self.service.prepare_token(token)
+        asyncio.run(self.persist_token(token))
 
     def _steps_api_call(self, date: pendulum.Date) -> dict:
         kwargs = {"resource": "activities/steps", "base_date": date, "period": "1d"}

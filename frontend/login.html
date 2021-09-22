@@ -1,0 +1,24 @@
+<html>
+  <head>
+    <title>Trek - Login</title>
+  </head>
+  <body>
+    <p>
+      <button type="button" onclick="login('fitbit')">Fitbit</button>
+    </p>
+    <p>
+      <button type="button" onclick="login('withings')">Withings</button>
+    </p>
+  </body>
+  <script>
+    "use strict";
+    async function login(tracker_name) {
+      let url = new URL("/user/auth/" + tracker_name, location.href);
+      url.searchParams.set("redirect_url", location.origin);
+      console.log(`Fetching ${url}`);
+      await fetch(url)
+        .then((response) => response.json())
+        .then((data) => (location.href = data.auth_url));
+    }
+  </script>
+</html>
