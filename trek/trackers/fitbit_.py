@@ -23,8 +23,70 @@ FitbitToken = dict
 #     expires_at: float
 
 
+class FitbitUser:
+    # service = FitbitService
+
+    def __init__(
+        self,
+        db: Database,
+        user_id: int,
+        token: FitbitToken,
+    ):
+        self.db = db
+        self.user_id = user_id
+        self.client = FitbitApi(
+            config.fitbit_client_id,
+            config.fitbit_client_secret,
+            access_token=token["access_token"],
+            refresh_token=token["refresh_token"],
+            expires_at=token["expires_at"],
+            refresh_cb=self._persist_token_callback,
+            system=FitbitApi.METRIC,
+        )
+
+    async def persist_token(self, token: FitbitToken) -> None:
+        tracker_user_id = FitbitService.tracker_user_id_from_token(token)
+        async with self.db.transaction():
+            await queries.persist_token(
+                self.db,
+                token=token,
+                user_id_=self.user_id,
+                tracker="fitbit",
+                tracker_user_id=tracker_user_id,
+            )
+
+    def _persist_token_callback(self, token: FitbitToken) -> None:
+        print("fitbit callback")
+        token = FitbitService.prepare_token(token)
+        asyncio.run(self.persist_token(token))
+
+    def _steps_api_call(self, date: pendulum.Date) -> dict:
+        kwargs = {"resource": "activities/steps", "base_date": date, "period": "1d"}
+        exc = None
+        data = None
+        for _ in range(10):
+            try:
+                data = self.client.time_series(**kwargs)
+                break
+            except fitbit.exceptions.HTTPServerError as e:
+                log.info("Error fetching fitbit data. Retrying")
+                exc = e
+        if data is None:
+            assert exc is not None
+            raise exc
+        return data
+
+    def steps(self, date: pendulum.Date) -> t.Optional[int]:
+        data = self._steps_api_call(date)
+        if not data["activities-steps"]:
+            return 0
+        entry = data["activities-steps"][0]
+        return int(entry["value"]) if entry else 0
+
+
 class FitbitService:
     name = "fitbit"
+    User = FitbitUser
 
     def __init__(self):
         client = FitbitOauth2Client(
@@ -52,64 +114,3 @@ class FitbitService:
     @staticmethod
     def tracker_user_id_from_token(token: FitbitToken) -> str:
         return "fitbit_" + str(token["user_id"])
-
-
-class FitbitUser:
-    service = FitbitService
-
-    def __init__(
-        self,
-        db: Database,
-        user_id: int,
-        token: FitbitToken,
-    ):
-        self.db = db
-        self.user_id = user_id
-        self.client = FitbitApi(
-            config.fitbit_client_id,
-            config.fitbit_client_secret,
-            access_token=token["access_token"],
-            refresh_token=token["refresh_token"],
-            expires_at=token["expires_at"],
-            refresh_cb=self._persist_token_callback,
-            system=FitbitApi.METRIC,
-        )
-
-    async def persist_token(self, token: FitbitToken) -> None:
-        tracker_user_id = self.service.tracker_user_id_from_token(token)
-        async with self.db.transaction():
-            await queries.persist_token(
-                self.db,
-                token=token,
-                user_id_=self.user_id,
-                tracker="fitbit",
-                tracker_user_id=tracker_user_id,
-            )
-
-    def _persist_token_callback(self, token: FitbitToken) -> None:
-        print("fitbit callback")
-        token = self.service.prepare_token(token)
-        asyncio.run(self.persist_token(token))
-
-    def _steps_api_call(self, date: pendulum.Date) -> dict:
-        kwargs = {"resource": "activities/steps", "base_date": date, "period": "1d"}
-        exc = None
-        data = None
-        for _ in range(10):
-            try:
-                data = self.client.time_series(**kwargs)
-                break
-            except fitbit.exceptions.HTTPServerError as e:
-                log.info("Error fetching fitbit data. Retrying")
-                exc = e
-        if data is None:
-            assert exc is not None
-            raise exc
-        return data
-
-    def steps(self, date: pendulum.Date) -> t.Optional[int]:
-        data = self._steps_api_call(date)
-        if not data["activities-steps"]:
-            return 0
-        entry = data["activities-steps"][0]
-        return int(entry["value"]) if entry else 0

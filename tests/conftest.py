@@ -2,10 +2,11 @@ import typing as t
 
 from async_asgi_testclient import TestClient
 from databases import Database
+from fastapi_jwt_auth import AuthJWT
 from testcontainers.postgres import PostgresContainer
 from ward import fixture
 
-from trek import crud, database, main, user
+from trek import crud, database, main, user, utils
 from trek.database import get_db
 from trek.trackers import _tracker_utils
 
@@ -59,3 +60,34 @@ async def all_rows_in_table(db, table: str):
     records = await db.fetch_all(f"select * from {table}")
     as_dict = [dict(record) for record in records]
     return as_dict
+
+
+class FakeAuth:
+    def __init__(self, user_id=1):
+        self.user_id = user_id
+
+    def __call__(self):
+        return self
+
+    def get_jwt_subject(self):
+        return self.user_id
+
+    def create_access_token(self, subject):
+        return f"access_token-{subject}"
+
+
+def overide(overrides: dict, container: dict = main.app.dependency_overrides):
+    @fixture
+    def inner():
+        old_dependency_overrides = container.copy()
+        container.update(overrides)
+        yield
+        container.update(old_dependency_overrides)
+
+    return inner
+
+
+auth_overrides = {
+    AuthJWT: FakeAuth,
+    utils.protect_endpoint: lambda: None,
+}

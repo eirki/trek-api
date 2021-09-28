@@ -8,7 +8,7 @@
  */
 -- name: create_schema#
 create table user_ (
-    id serial primary key,
+    id serial not null primary key,
     is_admin boolean not null default false
 );
 

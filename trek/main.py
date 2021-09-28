@@ -26,6 +26,7 @@ TESTING = sys.argv[0].endswith("ward/__main__.py")
 
 class AuthSettings(BaseModel):
     authjwt_secret_key: str = config.jwt_secret_key
+    authjwt_access_token_expires = False
 
 
 @AuthJWT.load_config

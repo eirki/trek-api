@@ -53,12 +53,9 @@ class AuthorizeResponse(BaseModel):
 
 
 @router.get("/auth/{tracker_name}", response_model=AuthorizeResponse)
-def authorize(
-    tracker_name: trackers.TrackerName,
-    redirect_url: HttpUrl,
-    Authorize: AuthJWT = Depends(),
-):
-    service = trackers.init_service(tracker_name)
+def authorize(tracker_name: trackers.TrackerName, redirect_url: HttpUrl):
+    Service = trackers.name_to_service[tracker_name]
+    service = Service()
     auth_url = service.authorization_url()
     state_params = {"redirect_url": str(redirect_url)}
     encoded_params = encode_dict(state_params)
@@ -74,7 +71,8 @@ def add_tracker(
 ):
     Authorize.jwt_required()
     user_id = Authorize.get_jwt_subject()
-    service = trackers.init_service(tracker_name)
+    Service = trackers.name_to_service[tracker_name]
+    service = Service()
     auth_url = service.authorization_url()
     state_params = {"redirect_url": str(redirect_url), "user_id": user_id}
     encoded_params = encode_dict(state_params)
@@ -99,7 +97,8 @@ async def handle_redirect(
     db=Depends(get_db),
     Authorize: AuthJWT = Depends(),
 ):
-    service = trackers.init_service(tracker_name)
+    Service = trackers.name_to_service[tracker_name]
+    service = Service()
     token = service.token(code)
     tracker_user_id = service.tracker_user_id_from_token(token)
     state_params = decode_dict(state)
@@ -128,9 +127,7 @@ async def handle_redirect(
     else:
         print("new user")
         user_id = await add_user(db)
-    tracker_user = trackers.init_user(
-        db=db, tracker_name=tracker_name, user_id=user_id, token=token
-    )
+    tracker_user = service.User(db=db, user_id=user_id, token=token)
     await tracker_user.persist_token(token)
     access_token = Authorize.create_access_token(subject=user_id)
 
@@ -152,15 +149,15 @@ async def me(db: Database = Depends(get_db), Authorize: AuthJWT = Depends()):
     user_id = Authorize.get_jwt_subject()
     async with db.transaction():
         tokens = await tracker_queries.tokens_for_user(db, user_id=user_id)
+
     users = [
-        trackers.init_user(
+        trackers.name_to_service[token_data["tracker"]].User(
             user_id=token_data["user_id_"],
             token=token_data["token"],
-            tracker_name=token_data["tracker"],
             db=db,
         )
         for token_data in tokens
     ]
     now = pendulum.yesterday().date()
-    steps_data = {user.service.name: user.steps(now) for user in users}
+    steps_data = [user.steps(now) for user in users]
     return steps_data

@@ -1,53 +1,68 @@
-from databases import Database
 from ward import test
 
+from tests import conftest
 from tests.conftest import all_rows_in_table, client, connect_db
-
-
-async def _preadd_users(db: Database) -> list[int]:
-    sql = """insert into
-            user_ (name_)
-        values
-            (:name);
-        """
-    await db.execute_many(
-        sql,
-        values=[{"name": "testName1"}, {"name": "testName2"}, {"name": "testName3"}],
-    )
-    user_ids = await db.fetch_all("select id from user_")
-    assert len(user_ids) > 0
-    as_int = [user["id"] for user in user_ids]
-    assert all(isinstance(user_id, int) for user_id in as_int)
-    return as_int
+from trek import trackers, user
 
 
 @test("test_add_user ")
 async def test_add_user(db=connect_db):
-    response = await client.post("/user/", json={"name": "testUser1"})
-    assert response.json() == {"user_id": 1}
-    assert response.status_code == 200
+    user_id = await user.add_user(db)
+    assert user_id == 1
     res = await all_rows_in_table(db, "user_")
-    exp = [{"id": 1, "name_": "testUser1", "is_admin": False}]
+    exp = [{"id": 1, "is_admin": False}]
     assert res == exp
 
 
-@test("test_get_user")
-async def test_get_user(db=connect_db):
-    user_ids = await _preadd_users(db)
-    response = await client.get(f"/user/{user_ids[0]}")
+class FakeService:
+    auth_url = "https://authorization.url"
+
+    def authorization_url(self) -> str:
+        return self.auth_url
+
+    def token(self, code: str) -> dict:
+        pass
+
+    def tracker_user_id_from_token(self, token: dict) -> str:
+        pass
+
+    @property
+    def User(self):
+        return FakeUser
+
+
+class FakeUser:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    async def persist_token(self, token: dict):
+        pass
+
+
+@test("test_auth ")
+async def test_auth(
+    _=conftest.overide({"fitbit": FakeService}, container=trackers.name_to_service),
+):
+    response = await client.get(
+        "/user/auth/fitbit", query_string={"redirect_url": "https://www.redirect.me"}
+    )
     res = response.json()
-    exp = {"id": 1, "name": "testName1", "is_admin": False}
-    assert res == exp
+    assert "auth_url" in res
+    assert res["auth_url"].startswith(FakeService.auth_url)
 
 
-@test("test_get_all_users")
-async def test_get_all_users(db=connect_db):
-    await _preadd_users(db)
-    response = await client.get("/user/")
-    res = response.json()
-    exp = [
-        {"name": "testName1", "id": 1, "is_admin": False},
-        {"name": "testName2", "id": 2, "is_admin": False},
-        {"name": "testName3", "id": 3, "is_admin": False},
-    ]
-    assert res == exp
+@test("test_redirect ")
+async def test_redirect(
+    _a=connect_db,
+    _b=conftest.overide({"fitbit": FakeService}, container=trackers.name_to_service),
+):
+    response = await client.get(
+        "/user/redirect/fitbit",
+        query_string={
+            "state": "eyJyZWRpcmVjdF91cmwiOiAiaHR0cHM6Ly93d3cucmVkaXJlY3QubWUifQ==",
+            "code": "thisisacode",
+        },
+        allow_redirects=False,
+    )
+    assert response.status_code == 307  # redirect
+    assert response.headers["location"].startswith("https://www.redirect.me")

@@ -1,7 +1,16 @@
+/*
+ ^ Select One
+ $ Select Value
+ ! Insert/Update/Delete
+ <! Insert/Update/Delete Returning
+ *! Insert/Update/Delete Many
+ # Execute Scripts
+ */
 -- name: create_schema#
 create table trek (
     id serial primary key,
-    origin text not null
+    origin text not null,
+    owner_id int not null references user_(id)
 );
 
 
@@ -41,9 +50,9 @@ create table trek_user (
 
 -- name: add_trek<!
 insert into
-    trek (origin)
+    trek (origin, owner_id)
 values
-    (:origin) returning id;
+    (:origin, :owner_id) returning id;
 
 
 -- name: add_leg<!
@@ -114,6 +123,16 @@ where
     trek.id = :trek_id;
 
 
+-- name: get_all_treks
+select
+    id,
+    origin
+from
+    trek
+where
+    owner_id = :user_id;
+
+
 -- name: delete_trek!
 delete from
     waypoint
@@ -137,3 +156,16 @@ delete from
     trek
 where
     id = :trek_id;
+
+
+-- name: is_trek_owner$
+select
+    exists(
+        select
+            1
+        from
+            trek
+        where
+            id = :trek_id
+            and owner_id = :user_id
+    );

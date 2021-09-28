@@ -6,6 +6,7 @@ from freezegun import freeze_time
 import pendulum
 from ward import fixture, raises, test
 
+from tests import conftest
 from tests.conftest import all_rows_in_table, client, connect_db
 from trek import crud
 
@@ -55,13 +56,13 @@ def example_waypoints(trek_id: int, leg_id: int) -> list[dict]:
 
 async def _preadd_users(db: Database) -> list[int]:
     sql = """insert into
-            user_ (name_)
+            user_ (is_admin)
         values
-            (:name);
+            (:is_admin);
         """
     await db.execute_many(
         sql,
-        values=[{"name": "testName1"}, {"name": "testName2"}, {"name": "testName3"}],
+        values=[{"is_admin": False}] * 3,
     )
     user_ids = await db.fetch_all("select id from user_")
     assert len(user_ids) > 0
@@ -72,7 +73,9 @@ async def _preadd_users(db: Database) -> list[int]:
 
 async def _preadd_treks(db: Database, user_ids: list[int]) -> int:
     user_ids = await _preadd_users(db)
-    trek_record = await crud.queries.add_trek(db, origin="testOrigin")
+    trek_record = await crud.queries.add_trek(
+        db, origin="testOrigin", owner_id=user_ids[0]
+    )
     trek_id = trek_record["id"]
     leg_record = await crud.queries.add_leg(
         db,
@@ -86,7 +89,9 @@ async def _preadd_treks(db: Database, user_ids: list[int]) -> int:
     waypoints = example_waypoints(trek_id, leg_id)
     await crud.queries.add_waypoints(db, waypoints)
 
-    other_trek_record = await crud.queries.add_trek(db, origin="testOrigin2")
+    other_trek_record = await crud.queries.add_trek(
+        db, origin="testOrigin2", owner_id=user_ids[1]
+    )
     other_trek_id = other_trek_record["id"]
     await crud.queries.add_leg(
         db,
@@ -101,7 +106,11 @@ async def _preadd_treks(db: Database, user_ids: list[int]) -> int:
 
 
 @test("test_add ")
-async def test_add(db=connect_db, _=freeze):
+async def test_add(
+    db=connect_db,
+    _a=freeze,
+    _b=conftest.overide(conftest.auth_overrides),
+):
     user_ids = await _preadd_users(db)
     response = await client.post(
         "/trek/",
@@ -113,12 +122,7 @@ async def test_add(db=connect_db, _=freeze):
     assert response.json() == {"trek_id": 1}
     assert response.status_code == 200
     res = await all_rows_in_table(db, "trek")
-    exp = [
-        {
-            "id": 1,
-            "origin": "testOrigin",
-        }
-    ]
+    exp = [{"id": 1, "origin": "testOrigin", "owner_id": 1}]
     assert res == exp
 
     res = await all_rows_in_table(db, "trek_user")
@@ -127,7 +131,11 @@ async def test_add(db=connect_db, _=freeze):
 
 
 @test("test_add_leg")
-async def test_add_leg(db=connect_db, _=freeze):
+async def test_add_leg(
+    db=connect_db,
+    _a=freeze,
+    _b=conftest.overide(conftest.auth_overrides),
+):
     user_ids = await _preadd_users(db)
     trek_id = await _preadd_treks(db, user_ids)
     response = await client.post(
@@ -179,7 +187,10 @@ async def test_add_leg(db=connect_db, _=freeze):
 
 
 @test("test_get")
-async def test_get(db=connect_db):
+async def test_get(
+    db=connect_db,
+    _=conftest.overide(conftest.auth_overrides),
+):
     user_ids = await _preadd_users(db)
     trek_id = await _preadd_treks(db, user_ids)
 
@@ -198,7 +209,10 @@ async def test_get(db=connect_db):
 
 
 @test("test_delete")
-async def test_delete(db=connect_db):
+async def test_delete(
+    db=connect_db,
+    _=conftest.overide(conftest.auth_overrides),
+):
     user_ids = await _preadd_users(db)
     trek_id = await _preadd_treks(db, user_ids)
     response = await client.delete(f"/trek/{trek_id}")
@@ -218,14 +232,16 @@ async def test_delete(db=connect_db):
     res = await all_rows_in_table(db, "trek_user")
     assert res == []
     res = await all_rows_in_table(db, "trek")
-    exp = [{"id": 2, "origin": "testOrigin2"}]
+    exp = [{"id": 2, "origin": "testOrigin2", "owner_id": 2}]
     assert res == exp
 
 
 @test("test_two_ongoing_legs_fail")
 async def test_two_ongoing_legs_fail(db=connect_db):
-    await _preadd_users(db)
-    trek_record = await crud.queries.add_trek(db, origin="testOrigin")
+    user_ids = await _preadd_users(db)
+    trek_record = await crud.queries.add_trek(
+        db, origin="testOrigin", owner_id=user_ids[0]
+    )
     trek_id = trek_record["id"]
     leg_record = await crud.queries.add_leg(
         db,

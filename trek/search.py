@@ -3,8 +3,11 @@ from __future__ import annotations
 import logging
 import typing as t
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import JSONResponse
+from fastapi_jwt_auth import AuthJWT
 import openrouteservice
+from openrouteservice.exceptions import ApiError
 from pydantic import BaseModel, Field
 
 from trek import config
@@ -26,7 +29,8 @@ class LocationResult(BaseModel):
 
 @router.get("/locations", responses={200: {"model": LocationResult}})
 async def locations(
-    query=Query(
+    Authorize: AuthJWT = Depends(),
+    query: str = Query(
         ...,
         examples={
             "Name": {
@@ -38,8 +42,9 @@ async def locations(
                 "value": "59.333289,10.671775",
             },
         },
-    )
+    ),
 ) -> LocationResult:
+    Authorize.jwt_required()
     try:
         lat, lon = [float(q) for q in query.split(",")]
     except ValueError:
@@ -104,6 +109,7 @@ class Route(BaseModel):
 
 
 class RouteResult(BaseModel):
+    success = True
     route: Route
 
 
@@ -112,6 +118,7 @@ coord_desc = "Comma-separated lat lon coordinates"
 
 @router.get("/route", responses={200: {"model": RouteResult}})
 async def route(
+    Authorize: AuthJWT = Depends(),
     start: str = Query(..., example="59.3317064, 10.673249", description=coord_desc),
     stop: str = Query(..., example="59.3333289, 10.6718981", description=coord_desc),
     via: t.Optional[list[str]] = Query(
@@ -132,20 +139,30 @@ async def route(
         ),
     ),
 ):
+    Authorize.jwt_required()
     locations = []
     locations.append(Coordinates.from_string(start))
     if via:
         locations.extend([Coordinates.from_string(point) for point in via])
     locations.append(Coordinates.from_string(stop))
-
-    search_result = ors_client.directions(
-        coordinates=[[loc.lon, loc.lat] for loc in locations],
-        skip_segments=skip_segments,
-        options={"avoid_features": ["highways"]},
-        elevation=True,
-        format="geojson",
-        instructions=False,
-    )
+    try:
+        search_result = ors_client.directions(
+            coordinates=[[loc.lon, loc.lat] for loc in locations],
+            skip_segments=skip_segments,
+            options={"avoid_features": ["highways"]},
+            elevation=True,
+            format="geojson",
+            instructions=False,
+        )
+    except ApiError as exception:
+        # raise HTTPException(status_code=400, detail=exception.message)
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "detail": exception.message},
+        )
+    # openrouteservice.exceptions.ApiError: 404 ({'error': {'code': 2009, 'message': 'Route could not be found - Unable to find a route between points 1 (-74.0299730 40.9418650) and 2 (5.6577500 51.9962430).'}, 'info': {'engine': {'version': '6.6.1', 'build_date': '2021-07-05T10:57:48Z'}, 'timestamp': 1632480392173}})
+    # openrouteservice.exceptions.ApiError: 400 ({'error': {'code': 2004, 'message': 'Request parameters exceed the server configuration limits. The approximated route distance must not be greater than 6000000.0 meters.'}, 'info': {'engine': {'version': '6.6.1', 'build_date': '2021-07-05T10:57:48Z'}, 'timestamp': 1632479278709}})
+    # openrouteservice.exceptions.ApiError: 404 ({'error': {'code': 2010, 'message': 'Could not find routable point within a radius of 350.0 meters of specified coordinate 1: 10.7043860 60.0158980.'}, 'info': {'engine': {'version': '6.6.1', 'build_date': '2021-07-05T10:57:48Z'}, 'timestamp': 1632484133326}})
     if len(search_result["features"]) == 0:
         raise Exception
     route_data = search_result["features"][0]

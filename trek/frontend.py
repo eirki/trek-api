@@ -19,3 +19,10 @@ async def login():
     with open("frontend/login.html") as file:
         html = file.read()
     return html
+
+
+@router.get("/newtrek", response_class=HTMLResponse)
+async def newtrek():
+    with open("frontend/newtrek.html") as file:
+        html = file.read()
+    return html

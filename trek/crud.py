@@ -4,17 +4,38 @@ import logging
 
 import aiosql
 from databases import Database
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi_jwt_auth import AuthJWT
 from geopy.distance import distance
 import pendulum
 from pydantic import BaseModel, Field
 
 from trek.database import DatabasesAdapter, get_db
+from trek.utils import protect_endpoint
 
 log = logging.getLogger(__name__)
-router = APIRouter(prefix="/trek", tags=["treks"])
+router = APIRouter(
+    prefix="/trek", tags=["treks"], dependencies=[Depends(protect_endpoint)]
+)
 queries = aiosql.from_path("sql/crud.sql", DatabasesAdapter)
+
+
+async def assert_trek_owner(db: Database, trek_id: int, user_id: int) -> None:
+    if not await queries.is_trek_owner(db, trek_id=trek_id, user_id=user_id):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
+@router.get("/{trek_id}/invite/")
+async def add_user_to_trek(
+    trek_id: int,
+    db: Database = Depends(get_db),
+    Authorize: AuthJWT = Depends(),
+):
+    user_id = Authorize.get_jwt_subject()
+    await assert_trek_owner(db, trek_id, user_id)
+    # trek_data = await queries.get_trek(db, trek_id=trek_id)
+    # record = GetResponse(**trek_data)
+    # return record
 
 
 class AddRequest(BaseModel):
@@ -28,8 +49,8 @@ async def add_trek(
     db: Database = Depends(get_db),
     Authorize: AuthJWT = Depends(),
 ):
-    Authorize.jwt_required()
-    trek_record = await queries.add_trek(db, origin=request.origin)
+    user_id = Authorize.get_jwt_subject()
+    trek_record = await queries.add_trek(db, origin=request.origin, owner_id=user_id)
     trek_id = trek_record["id"]
     users_in = [{"trek_id": trek_id, "user_id": user_id} for user_id in request.users]
     await queries.add_trek_users(db, users_in)
@@ -51,13 +72,25 @@ async def get_trek(
     db: Database = Depends(get_db),
     Authorize: AuthJWT = Depends(),
 ):
-    Authorize.jwt_required()
+    user_id = Authorize.get_jwt_subject()
+    await assert_trek_owner(db, trek_id, user_id)
     trek_data = await queries.get_trek(db, trek_id=trek_id)
     record = GetResponse(**trek_data)
     return record
 
 
-class ExtendRequest(BaseModel):
+@router.get("/}", response_model=GetResponse)
+async def get_all_treks(
+    db: Database = Depends(get_db),
+    Authorize: AuthJWT = Depends(),
+):
+    user_id = Authorize.get_jwt_subject()
+    trek_data = await queries.get_all_treks(db, user_id=user_id)
+    record = GetResponse(**trek_data)
+    return record
+
+
+class AddLegRequest(BaseModel):
     destination: str
     waypoints: list = Field(
         ...,
@@ -74,11 +107,12 @@ class ExtendRequest(BaseModel):
 @router.post("/{trek_id}")
 async def add_leg(
     trek_id: int,
-    request: ExtendRequest,
+    request: AddLegRequest,
     db: Database = Depends(get_db),
     Authorize: AuthJWT = Depends(),
 ):
-    Authorize.jwt_required()
+    user_id = Authorize.get_jwt_subject()
+    await assert_trek_owner(db, trek_id, user_id)
     leg_record = await queries.add_leg(
         db,
         trek_id=trek_id,
@@ -130,5 +164,6 @@ async def delete_trek(
     db: Database = Depends(get_db),
     Authorize: AuthJWT = Depends(),
 ):
-    Authorize.jwt_required()
+    user_id = Authorize.get_jwt_subject()
+    await assert_trek_owner(db, trek_id, user_id)
     await queries.delete_trek(db, trek_id=trek_id)
