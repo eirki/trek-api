@@ -15,6 +15,7 @@ import pendulum
 from pydantic import BaseModel, HttpUrl
 
 from trek import trackers
+from trek.crud import queries as crud_queries
 from trek.database import DatabasesAdapter, get_db
 from trek.trackers._tracker_utils import queries as tracker_queries
 
@@ -147,8 +148,7 @@ async def add_user(db: Database) -> int:
 async def me(db: Database = Depends(get_db), Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
     user_id = Authorize.get_jwt_subject()
-    async with db.transaction():
-        tokens = await tracker_queries.tokens_for_user(db, user_id=user_id)
+    tokens = await tracker_queries.tokens_for_user(db, user_id=user_id)
 
     users = [
         trackers.name_to_service[token_data["tracker"]].User(
@@ -160,4 +160,11 @@ async def me(db: Database = Depends(get_db), Authorize: AuthJWT = Depends()):
     ]
     now = pendulum.yesterday().date()
     steps_data = [user.steps(now) for user in users]
-    return steps_data
+    treks_owner_of = await crud_queries.get_treks_owner_of(db, user_id=user_id)
+    treks_user_in = await crud_queries.get_treks_user_in(db, user_id=user_id)
+    res = {
+        "steps_data": steps_data,
+        "treks_owner_of": treks_owner_of,
+        "treks_user_in": treks_user_in,
+    }
+    return res

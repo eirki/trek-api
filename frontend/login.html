@@ -10,15 +10,16 @@
       <button type="button" onclick="login('withings')">Withings</button>
     </p>
   </body>
-  <script>
-    "use strict";
+  <script type="module">
     async function login(tracker_name) {
       let url = new URL("/user/auth/" + tracker_name, location.href);
-      url.searchParams.set("redirect_url", location.origin);
+      url.searchParams.set("redirect_url", location.origin + "/index.html");
       console.log(`Fetching ${url}`);
       await fetch(url)
         .then((response) => response.json())
         .then((data) => (location.href = data.auth_url));
     }
+
+    window.login = login;
   </script>
 </html>

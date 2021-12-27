@@ -6,11 +6,12 @@ import sys
 from fastapi import FastAPI, Request
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi_jwt_auth import AuthJWT
 from fastapi_jwt_auth.exceptions import AuthJWTException
 from pydantic import BaseModel
 
-from trek import config, crud, database, frontend, logging_conf, search, user
+from trek import config, crud, database, logging_conf, search, user
 
 log = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ app = FastAPI()
 app.include_router(search.router)
 app.include_router(crud.router)
 app.include_router(user.router)
-app.include_router(frontend.router)
+app.mount("/", StaticFiles(directory="frontend"), name="frontend")
 
 DEBUG_MODE = "--reload" in sys.argv
 TESTING = sys.argv[0].endswith("ward/__main__.py")
@@ -106,4 +107,4 @@ def custom_openapi():
     return app.openapi_schema
 
 
-app.openapi = custom_openapi  # type: ignore
+# app.openapi = custom_openapi  # type: ignore

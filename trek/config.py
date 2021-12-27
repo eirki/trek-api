@@ -31,5 +31,6 @@ withings_consumer_secret = os.environ["trek_withings_consumer_secret"]
 withings_redirect_uri = os.environ["trek_withings_redirect_uri"]
 
 jwt_secret_key: Final = os.environ["trek_jwt_secret_key"]
+fernet_key: Final = os.environ["trek_fernet_key"].encode()
 
 ors_key: Final = os.environ["trek_ors_key"]

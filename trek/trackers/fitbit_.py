@@ -58,7 +58,9 @@ class FitbitUser:
     def _persist_token_callback(self, token: FitbitToken) -> None:
         print("fitbit callback")
         token = FitbitService.prepare_token(token)
-        asyncio.run(self.persist_token(token))
+        coro = self.persist_token(token)
+        asyncio.create_task(coro)
+        print("fitbit callback finished")
 
     def _steps_api_call(self, date: pendulum.Date) -> dict:
         kwargs = {"resource": "activities/steps", "base_date": date, "period": "1d"}

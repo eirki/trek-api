@@ -1,0 +1,40 @@
+<html>
+  <head>
+    <title>Trek - Join</title>
+  </head>
+  <body>
+    <div id="dataElem"></div>
+  </body>
+  <script type="module">
+    import { checkLoggedinOrRedirect } from "/authorize.js";
+    let token = checkLoggedinOrRedirect();
+
+    function main() {
+      let dataElem = document.getElementById("dataElem");
+      const queryString = window.location.search;
+      const urlParams = new URLSearchParams(queryString);
+      let encrypted_trek_id = urlParams.get("id");
+      if (!encrypted_trek_id) {
+        window.alert("no id");
+        return;
+      }
+      let url = new URL(`/trek/join/${encrypted_trek_id}/`, location.href);
+      console.log(`Fetching ${url}`);
+      fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: "Bearer " + token,
+        },
+      }).then((response) => {
+        if (response.status === 201) {
+          dataElem.innerHTML = "Joined trek";
+        } else if (response.status === 200) {
+          dataElem.innerHTML = "Already in trek";
+        } else {
+          dataElem.innerHTML = "Error";
+        }
+      });
+    }
+    main();
+  </script>
+</html>

@@ -1,6 +1,6 @@
 -- name: migrations#
 create table user_ (
-    id serial primary key,
+    id serial not null primary key,
     is_admin boolean not null default false
 );
 
@@ -8,7 +8,7 @@ create table user_ (
 create table trek (
     id serial primary key,
     origin text not null,
-    owner_id int references user_(id)
+    owner_id int not null references user_(id)
 );
 
 
@@ -44,6 +44,9 @@ create table trek_user (
     trek_id int references trek(id),
     user_id int references user_(id)
 );
+
+
+create unique index trek_user_unq_ix on trek_user (trek_id, user_id);
 
 
 create type tracker_type as enum ('fitbit', 'withings');

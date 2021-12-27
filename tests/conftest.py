@@ -87,7 +87,8 @@ def overide(overrides: dict, container: dict = main.app.dependency_overrides):
     return inner
 
 
-auth_overrides = {
-    AuthJWT: FakeAuth,
-    utils.protect_endpoint: lambda: None,
-}
+def auth_overrides(user_id=1):
+    return {
+        AuthJWT: FakeAuth(user_id=user_id),
+        utils.protect_endpoint: lambda: None,
+    }

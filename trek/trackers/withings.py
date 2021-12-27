@@ -61,7 +61,7 @@ class WithingsUser:
     def _persist_token_callback(self, credentials: Credentials) -> None:
         print("withings callback")
         token = WithingsService.prepare_token(credentials)
-        asyncio.run(self.persist_token(token))
+        asyncio.create_task(self.persist_token(token))
 
     def _steps_api_call(self, date: pendulum.Date) -> MeasureGetActivityResponse:
         return self.client.measure_get_activity(

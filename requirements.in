@@ -14,3 +14,4 @@ python-jose[cryptography]
 openrouteservice
 fastapi-jwt-auth
 geopy
+aiofiles

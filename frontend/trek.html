@@ -1,0 +1,79 @@
+<html>
+  <head>
+    <title>Trek - Data</title>
+  </head>
+  <body>
+    <div id="dataElem"></div>
+    <div>
+      <button id="generateInviteButton" hidden onclick="generateInviteUrl()">
+        Generate invite url
+      </button>
+      <div id="inviteUrl"></div>
+    </div>
+  </body>
+  <script type="module">
+    import { checkLoggedinOrRedirect } from "/authorize.js";
+    let token = checkLoggedinOrRedirect();
+
+    function generateInviteUrl(trek_id) {
+      let url = new URL(`/trek/invite/${trek_id}/`, location.href);
+      console.log(`Fetching ${url}`);
+      fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: "Bearer " + token,
+        },
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          let inviteUrlElem = document.getElementById("inviteUrl");
+          let generateInviteButton = document.getElementById(
+            "generateInviteButton"
+          );
+          let url = new URL("/join.html", location.origin);
+          url.searchParams.set("id", data.invite_id);
+          inviteUrlElem.innerHTML = url;
+        });
+    }
+    function main() {
+      const queryString = window.location.search;
+      const urlParams = new URLSearchParams(queryString);
+      let trek_id = urlParams.get("id");
+      if (!trek_id) {
+        window.alert("no id");
+        return;
+      }
+      window.generateInviteUrl = () => generateInviteUrl(trek_id);
+
+      let url = new URL(`/trek/${trek_id}`, location.href);
+      console.log(`Fetching ${url}`);
+      fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: "Bearer " + token,
+        },
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          let dataElem = document.getElementById("dataElem");
+          let origin = document.createElement("div");
+          origin.innerHTML = `From: ${data.origin}`;
+          dataElem.appendChild(origin);
+
+          let users = document.createElement("div");
+          users.innerHTML = `Users: ${data.users}`;
+          dataElem.appendChild(users);
+
+          data.legs.forEach((leg) => {
+            let legElem = document.createElement("div");
+            legElem.innerHTML = `To: ${leg.destination} (${leg.added_at})`;
+            dataElem.appendChild(legElem);
+          });
+
+          generateInviteButton.hidden = !data.is_owner;
+        });
+    }
+
+    main();
+  </script>
+</html>
