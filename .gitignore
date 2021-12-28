@@ -22,3 +22,4 @@ cov.xml
 *,cover
 node_modules
 .cache*
+htmlcov/*
