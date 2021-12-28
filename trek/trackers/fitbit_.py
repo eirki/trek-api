@@ -46,6 +46,8 @@ class FitbitUser:
 
     async def persist_token(self, token: FitbitToken) -> None:
         tracker_user_id = FitbitService.tracker_user_id_from_token(token)
+        while self.db.connection()._transaction_lock.locked():
+            await asyncio.sleep(1)
         async with self.db.transaction():
             await queries.persist_token(
                 self.db,
