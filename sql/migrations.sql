@@ -17,6 +17,7 @@ create table leg (
     trek_id int references trek(id),
     destination text not null,
     added_at timestamp with time zone not null,
+    added_by int references user_(id),
     is_ongoing boolean not null default false
 );
 
@@ -42,7 +43,8 @@ create index waypoint_ix_distance on waypoint (distance);
 
 create table trek_user (
     trek_id int references trek(id),
-    user_id int references user_(id)
+    user_id int references user_(id),
+    added_at timestamp with time zone not null
 );
 
 
