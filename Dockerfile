@@ -11,3 +11,4 @@ RUN python -m venv venv && venv/bin/pip install --upgrade pip && venv/bin/pip in
 
 COPY trek ./trek
 COPY sql ./sql
+COPY frontend ./frontend
