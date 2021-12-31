@@ -28,7 +28,6 @@ install-deps:
 	pip-compile requirements-dev.in
 	pip-sync requirements*.txt
 
-
 _assert-no-unstaged-changes:
 	git update-index --refresh
 	git diff-index --quiet HEAD --
@@ -45,4 +44,10 @@ _deploy:
 _git-push:
 	git push --no-verify
 
-push: _assert-no-unstaged-changes _assert-docker-machine-active test _deploy _git-push
+push:
+	#!/usr/bin/env fish
+	just _assert-no-unstaged-changes
+	just test
+	eval (docker-machine env docker-droplet)
+	just _deploy
+	just _git-push
