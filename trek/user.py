@@ -64,7 +64,11 @@ def authorize(tracker_name: trackers.TrackerName, redirect_url: HttpUrl):
     return {"auth_url": auth_url}
 
 
-@router.get("/add_tracker/{tracker_name}", response_model=AuthorizeResponse)
+@router.get(
+    "/add_tracker/{tracker_name}",
+    response_model=AuthorizeResponse,
+    operation_id="authorize",
+)
 def add_tracker(
     tracker_name: trackers.TrackerName,
     redirect_url: HttpUrl,

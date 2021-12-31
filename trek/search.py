@@ -3,9 +3,8 @@ from __future__ import annotations
 import logging
 import typing as t
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
-from fastapi_jwt_auth import AuthJWT
 import openrouteservice
 from openrouteservice.exceptions import ApiError
 from pydantic import BaseModel, Field
@@ -27,9 +26,13 @@ class LocationResult(BaseModel):
     locations: list[Location]
 
 
-@router.get("/locations", responses={200: {"model": LocationResult}})
+@router.get(
+    "/locations",
+    responses={200: {"model": LocationResult}},
+    # operation_id="authorize",
+)
 async def locations(
-    Authorize: AuthJWT = Depends(),
+    # Authorize: AuthJWT = Depends(),
     query: str = Query(
         ...,
         examples={
@@ -44,7 +47,7 @@ async def locations(
         },
     ),
 ) -> LocationResult:
-    Authorize.jwt_required()
+    # Authorize.jwt_required()
     try:
         lat, lon = [float(q) for q in query.split(",")]
     except ValueError:
@@ -116,9 +119,13 @@ class RouteResult(BaseModel):
 coord_desc = "Comma-separated lat lon coordinates"
 
 
-@router.get("/route", responses={200: {"model": RouteResult}})
+@router.get(
+    "/route",
+    responses={200: {"model": RouteResult}},
+    # operation_id="authorize",
+)
 async def route(
-    Authorize: AuthJWT = Depends(),
+    # Authorize: AuthJWT = Depends(),
     start: str = Query(..., example="59.3317064, 10.673249", description=coord_desc),
     stop: str = Query(..., example="59.3333289, 10.6718981", description=coord_desc),
     via: t.Optional[list[str]] = Query(
@@ -139,7 +146,7 @@ async def route(
         ),
     ),
 ):
-    Authorize.jwt_required()
+    # Authorize.jwt_required()
     locations = []
     locations.append(Coordinates.from_string(start))
     if via:

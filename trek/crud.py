@@ -63,7 +63,11 @@ class GenerateInviteResponse(BaseModel):
     invite_id: str = Field(..., description="Encrypted invite id")
 
 
-@router.get("/invite/{trek_id}/", response_model=GenerateInviteResponse)
+@router.get(
+    "/invite/{trek_id}/",
+    response_model=GenerateInviteResponse,
+    operation_id="authorize",
+)
 async def generate_trek_invite(
     trek_id: int,
     db: Database = Depends(get_db),
@@ -75,7 +79,7 @@ async def generate_trek_invite(
     return {"invite_id": encrypted_trek_id}
 
 
-@router.get("/join/{encrypted_trek_id}/")
+@router.get("/join/{encrypted_trek_id}/", operation_id="authorize")
 async def add_user_to_trek(
     encrypted_trek_id: str,
     db: Database = Depends(get_db),
@@ -103,7 +107,7 @@ class AddResponse(BaseModel):
     leg_id: int
 
 
-@router.post("/", response_model=AddResponse)
+@router.post("/", response_model=AddResponse, operation_id="authorize")
 async def add_trek(
     request: AddRequest,
     db: Database = Depends(get_db),
@@ -140,7 +144,7 @@ class GetResponse(BaseModel):
     is_owner: bool
 
 
-@router.get("/{trek_id}", response_model=GetResponse)
+@router.get("/{trek_id}", response_model=GetResponse, operation_id="authorize")
 async def get_trek(
     trek_id: int,
     db: Database = Depends(get_db),
@@ -160,7 +164,7 @@ class AddLegRequest(BaseModel):
     waypoints: list = waypointsField
 
 
-@router.post("/{trek_id}")
+@router.post("/{trek_id}", operation_id="authorize")
 async def add_leg(
     trek_id: int,
     request: AddLegRequest,
@@ -234,7 +238,7 @@ def waypoint_tuple_to_dicts(
     return result
 
 
-@router.delete("/{trek_id}")
+@router.delete("/{trek_id}", operation_id="authorize")
 async def delete_trek(
     trek_id: int,
     db: Database = Depends(get_db),

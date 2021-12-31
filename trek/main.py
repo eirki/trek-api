@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import suppress
 import logging
 import sys
 
@@ -86,10 +87,11 @@ def custom_openapi():
 
     # Get routes from index 4 because before that fastapi define router for /openapi.json, /redoc, /docs, etc
     # Get all router where operation_id is authorize
-    router_authorize = [
-        route for route in app.routes[4:] if route.operation_id == "authorize"  # type: ignore
-    ]
-
+    router_authorize = []
+    for route in app.routes[4:]:
+        with suppress(AttributeError):
+            if route.operation_id == "authorize":  # type: ignore
+                router_authorize.append(route)
     for route in router_authorize:
         method = list(route.methods)[0].lower()  # type: ignore
         try:
@@ -107,4 +109,4 @@ def custom_openapi():
     return app.openapi_schema
 
 
-# app.openapi = custom_openapi  # type: ignore
+app.openapi = custom_openapi  # type: ignore
