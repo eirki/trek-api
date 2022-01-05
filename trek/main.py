@@ -5,6 +5,7 @@ import logging
 import sys
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,12 +16,25 @@ from pydantic import BaseModel
 from trek import config, crud, database, logging_conf, search, user
 
 log = logging.getLogger(__name__)
+origins = [
+    "https://bogsynth.com",
+    "http://localhost",
+    "http://localhost:8080",
+]
+
 
 app = FastAPI()
 app.include_router(search.router)
 app.include_router(crud.router)
 app.include_router(user.router)
 app.mount("/", StaticFiles(directory="frontend"), name="frontend")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 DEBUG_MODE = "--reload" in sys.argv
 TESTING = sys.argv[0].endswith("ward/__main__.py")
