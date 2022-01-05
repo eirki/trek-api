@@ -46,14 +46,20 @@ async def locations(
             },
         },
     ),
-) -> LocationResult:
+):
     # Authorize.jwt_required()
     try:
-        lat, lon = [float(q) for q in query.split(",")]
-    except ValueError:
-        search_result = ors_client.pelias_autocomplete(text=query)
-    else:
-        search_result = ors_client.pelias_reverse(point=[lon, lat])
+        try:
+            lat, lon = [float(q) for q in query.split(",")]
+        except ValueError:
+            search_result = ors_client.pelias_autocomplete(text=query)
+        else:
+            search_result = ors_client.pelias_reverse(point=[lon, lat])
+    except ApiError as exception:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "detail": exception.message},
+        )
     location_data = search_result["features"]
     locations = [
         Location(
@@ -169,6 +175,7 @@ async def route(
         )
     # openrouteservice.exceptions.ApiError: 404 ({'error': {'code': 2009, 'message': 'Route could not be found - Unable to find a route between points 1 (-74.0299730 40.9418650) and 2 (5.6577500 51.9962430).'}, 'info': {'engine': {'version': '6.6.1', 'build_date': '2021-07-05T10:57:48Z'}, 'timestamp': 1632480392173}})
     # openrouteservice.exceptions.ApiError: 400 ({'error': {'code': 2004, 'message': 'Request parameters exceed the server configuration limits. The approximated route distance must not be greater than 6000000.0 meters.'}, 'info': {'engine': {'version': '6.6.1', 'build_date': '2021-07-05T10:57:48Z'}, 'timestamp': 1632479278709}})
+    # openrouteservice.exceptions.ApiError: 403 ({'error': 'Daily quota reached or API key unauthorized'})
     # openrouteservice.exceptions.ApiError: 404 ({'error': {'code': 2010, 'message': 'Could not find routable point within a radius of 350.0 meters of specified coordinate 1: 10.7043860 60.0158980.'}, 'info': {'engine': {'version': '6.6.1', 'build_date': '2021-07-05T10:57:48Z'}, 'timestamp': 1632484133326}})
     if len(search_result["features"]) == 0:
         raise Exception
