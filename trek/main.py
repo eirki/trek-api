@@ -17,7 +17,8 @@ from trek import config, crud, database, logging_conf, search, user
 
 log = logging.getLogger(__name__)
 origins = [
-    "https://www.bogsynth.com/trek/#/",
+    "https://www.bogsynth.com",
+    "https://bogsynth.com",
     "http://localhost",
     "http://localhost:8080",
     "http://127.0.0.1:8080",
