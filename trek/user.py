@@ -5,6 +5,7 @@ import json
 import logging
 import typing as t  # noqa
 import urllib.parse
+import uuid
 
 import aiosql
 from databases import Database
@@ -40,12 +41,18 @@ def decode_dict(data: str) -> dict:
     return message_out
 
 
+FRAGMENT_PLACEHOLDER = str(uuid.uuid4())
+
+
 def add_params_to_url(url: str, params: dict) -> str:
-    url_parts = list(urllib.parse.urlparse(url))
-    query = dict(urllib.parse.parse_qsl(url_parts[4]))
+    # urllib expects query params to come before '#'. Vue does not
+    url = url.replace("#", FRAGMENT_PLACEHOLDER)
+    url_parts = urllib.parse.urlsplit(url)
+    query = dict(urllib.parse.parse_qsl(url_parts.query))
     query.update(params)
-    url_parts[4] = urllib.parse.urlencode(query)
-    new_url = urllib.parse.urlunparse(url_parts)
+    new_url_parts = url_parts._replace(query=urllib.parse.urlencode(query))
+    new_url = urllib.parse.urlunsplit(new_url_parts)
+    new_url = new_url.replace(FRAGMENT_PLACEHOLDER, "#")
     return new_url
 
 
@@ -54,7 +61,7 @@ class AuthorizeResponse(BaseModel):
 
 
 @router.get("/auth/{tracker_name}", response_model=AuthorizeResponse)
-def authorize(tracker_name: trackers.TrackerName, redirect_url: HttpUrl):
+def authorize(tracker_name: trackers.TrackerName, redirect_url: str):
     Service = trackers.name_to_service[tracker_name]
     service = Service()
     auth_url = service.authorization_url()
@@ -85,16 +92,7 @@ def add_tracker(
     return {"auth_url": auth_url}
 
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-
-class TokenData(BaseModel):
-    user_id: int
-
-
-@router.get("/redirect/{tracker_name}", response_model=Token, include_in_schema=False)
+@router.get("/redirect/{tracker_name}", include_in_schema=False)
 async def handle_redirect(
     tracker_name: trackers.TrackerName,
     code: str,
@@ -168,8 +166,10 @@ async def me(db: Database = Depends(get_db), Authorize: AuthJWT = Depends()):
     treks_owner_of = await crud_queries.get_treks_owner_of(db, user_id=user_id)
     treks_user_in = await crud_queries.get_treks_user_in(db, user_id=user_id)
     res = {
+        "user_id": user_id,
         "steps_data": steps_data,
         "treks_owner_of": treks_owner_of,
         "treks_user_in": treks_user_in,
+        "trackers": [token_data["tracker"] for token_data in tokens],
     }
     return res
