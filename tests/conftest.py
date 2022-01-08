@@ -6,7 +6,7 @@ from fastapi_jwt_auth import AuthJWT
 from testcontainers.postgres import PostgresContainer
 from ward import fixture
 
-from trek import crud, database, main, user, utils
+from trek import crud, main, user, utils
 from trek.database import get_db
 from trek.trackers import _tracker_utils
 
@@ -20,9 +20,6 @@ async def setup_db():
         test_database = Database(db_test_uri, force_rollback=True)
 
         await test_database.connect()
-        await database.register_json_conversion(
-            test_database.connection().raw_connection
-        )
         async with test_database.transaction(force_rollback=True):
             await user.queries.create_schema(test_database)
             await crud.queries.create_schema(test_database)

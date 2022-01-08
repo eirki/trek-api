@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import json
 
 from databases import Database
 from ward import test
@@ -42,12 +43,13 @@ class FakeService:
 @test("test_persist_token ")
 async def test_persist_token(db=connect_db):
     user_ids = await _preadd_users(db)
-    token = fake_token(user_id=user_ids[0])
+    token_in = fake_token(user_id=user_ids[0])
     fake_service = FakeService(db=db, user_id=user_ids[0])
-    await FitbitUser.persist_token(fake_service, token=token)  # type: ignore
+    await FitbitUser.persist_token(fake_service, token=token_in)  # type: ignore
     tokens = await db.fetch_all("select * from user_token")
     assert len(tokens) == 1
-    token = dict(tokens[0])
+    token_table = dict(tokens[0])
+    token_table["token"] = json.loads(token_table["token"])
     exp = {
         "token": {
             "access_token": "access_token1",
@@ -59,4 +61,4 @@ async def test_persist_token(db=connect_db):
         "tracker_user_id": "fitbit_fb1",
         "user_id_": 1,
     }
-    assert token == exp
+    assert token_table == exp

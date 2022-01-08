@@ -65,11 +65,6 @@ async def startup():
         if not DEBUG_MODE:
             raise
         log.warn("No database connection")
-    else:
-        async with database.database_pool.transaction():
-            await database.register_json_conversion(
-                database.database_pool.connection().raw_connection
-            )
 
 
 @app.on_event("shutdown")

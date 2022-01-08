@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import typing as t
 
 from databases import Database
@@ -55,7 +56,7 @@ class WithingsUser:
         async with self.db.transaction():
             await queries.persist_token(
                 self.db,
-                token=token,
+                token=json.dumps(token),
                 user_id_=self.user_id,
                 tracker="withings",
                 tracker_user_id=tracker_user_id,

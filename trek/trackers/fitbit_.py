@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import typing as t
 
@@ -51,7 +52,7 @@ class FitbitUser:
         async with self.db.transaction():
             await queries.persist_token(
                 self.db,
-                token=token,
+                token=json.dumps(token),
                 user_id_=self.user_id,
                 tracker="fitbit",
                 tracker_user_id=tracker_user_id,

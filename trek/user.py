@@ -152,7 +152,8 @@ async def add_user(db: Database) -> int:
 async def me(db: Database = Depends(get_db), Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
     user_id = Authorize.get_jwt_subject()
-    tokens = await tracker_queries.tokens_for_user(db, user_id=user_id)
+    token_strings = await tracker_queries.tokens_for_user(db, user_id=user_id)
+    tokens = [json.loads(token_string) for token_string in token_strings]
 
     users = [
         trackers.name_to_service[token_data["tracker"]].User(

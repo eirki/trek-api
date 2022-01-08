@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 
 import aiosql
@@ -15,15 +14,6 @@ log = logging.getLogger(__name__)
 
 
 database_pool = Database(config.db_uri)
-
-
-async def register_json_conversion(conn):
-    await conn.set_type_codec(
-        "json",
-        encoder=json.dumps,
-        decoder=json.loads,
-        schema="pg_catalog",
-    )
 
 
 def split_query(query: str) -> list[str]:

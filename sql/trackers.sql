@@ -3,7 +3,7 @@ create type tracker_type as enum ('fitbit', 'withings');
 
 
 create table user_token (
-  token json not null,
+  token text not null,
   user_id_ smallint not null references user_(id),
   tracker tracker_type not null,
   tracker_user_id text unique not null
