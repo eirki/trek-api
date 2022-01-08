@@ -1,7 +1,7 @@
 version: "3"
 services:
-  trek_server:
-    container_name: trekapi
+  trekapi_server:
+    container_name: trekapi_server
     build: .
     env_file:
       - .env
