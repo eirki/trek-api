@@ -38,7 +38,7 @@ async def connect_db(db=setup_db):
 
         main.app.dependency_overrides[get_db] = get_test_db
         yield db  # yield to test
-
+        del main.app.dependency_overrides[get_db]
     await reset_sequences(db)
 
 
@@ -66,6 +66,9 @@ class FakeAuth:
     def __call__(self):
         return self
 
+    def jwt_required(self):
+        pass
+
     def get_jwt_subject(self):
         return self.user_id
 
@@ -76,10 +79,14 @@ class FakeAuth:
 def overide(overrides: dict, container: dict = main.app.dependency_overrides):
     @fixture
     def inner():
-        old_dependency_overrides = container.copy()
+        old_container = container.copy()
         container.update(overrides)
         yield
-        container.update(old_dependency_overrides)
+        # mutably reset overrides after test
+        keys = set(container)
+        for key in keys:
+            del container[key]
+        container.update(old_container)
 
     return inner
 

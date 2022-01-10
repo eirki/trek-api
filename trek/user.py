@@ -146,7 +146,15 @@ async def add_user(db: Database) -> int:
     return user_id
 
 
-@router.get("/me", operation_id="authorize")
+class MeResponse(BaseModel):
+    user_id: int
+    steps_data: list
+    treks_owner_of: list
+    treks_user_in: list
+    trackers: list
+
+
+@router.get("/me", response_model=MeResponse, operation_id="authorize")
 async def me(db: Database = Depends(get_db), Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
     user_id = Authorize.get_jwt_subject()
@@ -173,3 +181,18 @@ async def me(db: Database = Depends(get_db), Authorize: AuthJWT = Depends()):
         "trackers": [token_data["tracker"] for token_data in tokens],
     }
     return res
+
+
+class IsAuthenticatedResponse(BaseModel):
+    user_id: int
+
+
+@router.get(
+    "/is_authenticated",
+    response_model=IsAuthenticatedResponse,
+    operation_id="authorize",
+)
+async def is_authenticated(Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    user_id = Authorize.get_jwt_subject()
+    return {"user_id": user_id}

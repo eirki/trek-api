@@ -66,3 +66,18 @@ async def test_redirect(
     )
     assert response.status_code == 307  # redirect
     assert response.headers["location"].startswith("https://www.redirect.me")
+
+
+@test("is_authenticated")
+async def test_is_authenticated(_=conftest.overide(conftest.auth_overrides(user_id=4))):
+    response = await client.get("/user/is_authenticated")
+    assert response.status_code == 200
+    res = response.json()
+    exp = {"user_id": 4}
+    assert res == exp
+
+
+@test("not_is_authenticated")
+async def test_not_is_authenticated():
+    response = await client.get("/user/is_authenticated")
+    assert response.status_code == 401
