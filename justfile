@@ -13,7 +13,7 @@ run:
 	uvicorn trek.main:app
 
 
-test:
+run-test-suite:
 	coverage run -m ward
 	-coverage html
 	coverage report
@@ -44,10 +44,8 @@ _deploy:
 _git-push:
 	git push --no-verify
 
-push:
+push: _assert-no-unstaged-changes run-test-suite
 	#!/usr/bin/env fish
-	just _assert-no-unstaged-changes
-	just test
 	eval (docker-machine env docker-droplet)
 	just _deploy
 	just _git-push
