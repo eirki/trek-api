@@ -53,12 +53,12 @@ def get_auth_config():
 
 
 @app.on_event("startup")
-async def startup_event():
+async def startup_event():  # pragma: no cover
     logging.config.dictConfig(logging_conf.LOGGING_CONFIG)  # type: ignore
 
 
 @app.on_event("startup")
-async def startup():
+async def startup():  # pragma: no cover
     try:
         await database.database_pool.connect()
     except Exception:
@@ -77,7 +77,7 @@ def authjwt_exception_handler(request: Request, exc: AuthJWTException):
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
 
 
-def custom_openapi():
+def custom_openapi():  # pragma: no cover
     if app.openapi_schema:
         return app.openapi_schema
 
