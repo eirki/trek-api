@@ -5,7 +5,7 @@ services:
     build: .
     env_file:
       - .env
-    command: "venv/bin/uvicorn trek.main:app --host 0.0.0.0 --port 5007"
+    command: "just serve"
     ports:
       - "5007:5007"
     networks:

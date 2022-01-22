@@ -1,51 +1,74 @@
 set dotenv-load := false
 
+venv_path := justfile_directory() + "/.venv"
+venv_script := venv_path + "/bin/activate"
 
-_default:
-  @just --list --unsorted
+default:
+    @just --list
 
+setup-venv:
+    #!/usr/bin/env bash
+    python3.9 -m venv .venv
+    attr -s com.dropbox.ignored -V 1 .venv
+    source {{venv_script}}
+    just install-deps
 
-run-dev:
-	uvicorn trek.main:app --reload
-
-
-run:
-	uvicorn trek.main:app
-
-
-run-test-suite:
-	coverage run -m ward
-	-coverage html
-	coverage report
-
-
-migrate:
-	python -m trek --mode=migrate
-
+install-deps-dev:
+    #!/usr/bin/env bash
+    source {{venv_script}}
+    pip install pip-tools==6.2.0
+    pip-compile
+    pip-compile requirements-dev.in
+    pip-sync requirements*.txt
 
 install-deps:
-	pip-compile requirements.in
-	pip-compile requirements-dev.in
-	pip-sync requirements*.txt
+    #!/usr/bin/env bash
+    source {{venv_script}}
+    pip install -r requirements.txt
+
+run-tests:
+    #!/usr/bin/env bash
+    source {{venv_script}}
+    coverage run -m ward
+    -coverage html
+    coverage report
+
+serve-dev:
+    #!/usr/bin/env bash
+    source {{venv_script}}
+    uvicorn trek.main:app --reload
+
+serve:
+    #!/usr/bin/env bash
+    source {{venv_script}}
+    uvicorn trek.main:app --host 0.0.0.0 --port 5007
+
+migrate:
+    #!/usr/bin/env bash
+    source {{venv_script}}
+    python -m trek --mode=migrate
+
 
 _assert-no-unstaged-changes:
-	git update-index --refresh
-	git diff-index --quiet HEAD --
+    git update-index --refresh
+    git diff-index --quiet HEAD --
 
 _assert-docker-machine-active:
-	# If no docker-machine active, run:
-	# docker-machine env docker-droplet; and eval (docker-machine env docker-droplet)
-	docker-machine active | grep -q 'docker-droplet'
+    # If no docker-machine active, run:
+    # docker-machine env docker-droplet; and eval (docker-machine env docker-droplet)
+    docker-machine active | grep -q 'docker-droplet'
 
 _deploy:
-	docker-compose build
-	docker-compose up -d
+    docker-compose build
+    docker-compose up -d
 
 _git-push:
-	git push --no-verify
+    git push --no-verify
 
-push: _assert-no-unstaged-changes run-test-suite
-	#!/usr/bin/env fish
-	eval (docker-machine env docker-droplet)
-	just _deploy
-	just _git-push
+push:
+    #!/usr/bin/env fish
+    just _assert-no-unstaged-changes
+    just run-tests
+    eval (docker-machine env docker-droplet)
+    just _deploy
+    just _git-push
