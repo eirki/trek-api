@@ -93,6 +93,7 @@ async def add_user_to_trek(
     except asyncpg.exceptions.UniqueViolationError:
         # user already in trek
         return Response(status_code=200)
+    # except other exception: trek does not exists
     return Response(status_code=201)
 
 
@@ -164,7 +165,15 @@ class AddLegRequest(BaseModel):
     waypoints: list = waypointsField
 
 
-@router.post("/{trek_id}", operation_id="authorize")
+class AddLegResponse(BaseModel):
+    leg_id: int
+
+
+@router.post(
+    "/{trek_id}",
+    operation_id="authorize",
+    response_model=AddLegResponse,
+)
 async def add_leg(
     trek_id: int,
     request: AddLegRequest,
@@ -202,6 +211,7 @@ async def add_leg(
     waypoints_in = waypoint_tuple_to_dicts(trek_id, leg_id, request.waypoints)
     await queries.add_waypoints(db, waypoints_in)
     await queries.start_leg(db, id=leg_id)
+    return AddLegResponse(leg_id=leg_id)
 
 
 def waypoint_tuple_to_dicts(
