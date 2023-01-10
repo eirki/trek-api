@@ -1,7 +1,9 @@
 import argparse
 import asyncio
 
-from trek import database
+import schedule
+
+from trek import database, progress
 
 
 async def main():  # pragma: no cover
@@ -15,6 +17,10 @@ async def main():  # pragma: no cover
         await database.migrate()
     else:
         raise Exception(f"Incorrect mode, {args.mode}")
+
+
+def run_scheduler():
+    schedule.every().hour.at(":00").do(progress.main.execute_all)
 
 
 if __name__ == "__main__":

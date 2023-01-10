@@ -3,10 +3,12 @@ uvicorn
 python-dotenv
 pydantic
 pendulum
+polars
+psycopg[binary]
+asyncpg
 aiosql
 migra[pg]
 sqlbag
-databases[postgresql]
 contextlib2
 fitbit
 withings-api
@@ -15,3 +17,12 @@ openrouteservice
 fastapi-jwt-auth
 geopy
 aiofiles
+gpxpy
+schedule
+azure-identity
+azure-storage-blob
+Pillow
+staticmap
+googlemaps
+httpx
+colorhash

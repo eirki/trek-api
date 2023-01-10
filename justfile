@@ -17,8 +17,8 @@ install-deps-dev:
     #!/usr/bin/env bash
     source {{venv_script}}
     pip install pip-tools==6.2.0
-    pip-compile
-    pip-compile requirements-dev.in
+    pip-compile --verbose
+    pip-compile --verbose requirements-dev.in
     pip-sync requirements*.txt
 
 install-deps:
@@ -30,7 +30,7 @@ run-tests:
     #!/usr/bin/env bash
     source {{venv_script}}
     coverage run -m ward
-    -coverage html
+    # -coverage html
     coverage report
 
 serve-dev:
@@ -57,6 +57,7 @@ _assert-docker-machine-active:
     # If no docker-machine active, run:
     # docker-machine env docker-droplet; and eval (docker-machine env docker-droplet)
     docker-machine active | grep -q 'docker-droplet'
+    docker context use droplet-ctx
 
 _deploy:
     docker-compose build

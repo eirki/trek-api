@@ -60,7 +60,7 @@ async def startup_event():  # pragma: no cover
 @app.on_event("startup")
 async def startup():  # pragma: no cover
     try:
-        await database.database_pool.connect()
+        await database.get_pool()
     except Exception:
         if not DEBUG_MODE:
             raise
@@ -69,7 +69,8 @@ async def startup():  # pragma: no cover
 
 @app.on_event("shutdown")
 async def shutdown():
-    await database.database_pool.disconnect()
+    pool = await database.get_pool()
+    await pool.close()
 
 
 @app.exception_handler(AuthJWTException)
@@ -121,3 +122,19 @@ def custom_openapi():  # pragma: no cover
 
 
 app.openapi = custom_openapi  # type: ignore
+
+if True:
+    from asyncpg import Connection
+    from fastapi import Depends
+
+    from trek.database import get_db
+
+
+@app.get("/health")
+async def health(db: Connection = Depends(get_db)):
+    # res = await db.fetch_one("select true;")
+    res = await db.fetch("SELECT 1")
+    return {
+        "db": res,
+        "status": "ok",
+    }

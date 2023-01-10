@@ -1,14 +1,14 @@
 from dataclasses import dataclass
 import json
 
-from databases import Database
+from asyncpg import Connection
 from ward import test
 
 from tests.conftest import connect_db
 from trek.trackers.fitbit_ import FitbitUser
 
 
-async def _preadd_users(db: Database) -> list[int]:
+async def _preadd_users(db: Connection) -> list[int]:
     sql = """insert into
             user_ (is_admin)
         values
@@ -36,7 +36,7 @@ def fake_token(user_id: int) -> dict:
 
 @dataclass
 class FakeService:
-    db: Database
+    db: Connection
     user_id: int
 
 

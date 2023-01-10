@@ -10,7 +10,12 @@
 create table trek (
     id serial primary key,
     origin text not null,
-    owner_id int not null references user_(id)
+    owner_id int not null references user_(id),
+    progress_at_hour smallint not null default 12 constraint hour_chk check (
+        progress_at_hour >= 0
+        and progress_at_hour <= 23
+    ),
+    progress_at_tz text not null default 'CET'
 );
 
 

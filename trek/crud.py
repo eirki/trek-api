@@ -3,11 +3,12 @@ from __future__ import annotations
 import base64
 import datetime as dt
 import logging
+import typing as t
 
 import aiosql
 import asyncpg
+from asyncpg import Connection
 from cryptography.fernet import Fernet
-from databases import Database
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi_jwt_auth import AuthJWT
 from geopy.distance import distance
@@ -15,14 +16,14 @@ import pendulum
 from pydantic import BaseModel, Field
 
 from trek import config
-from trek.database import DatabasesAdapter, get_db
+from trek.database import get_db
 from trek.utils import protect_endpoint
 
 log = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/trek", tags=["treks"], dependencies=[Depends(protect_endpoint)]
 )
-queries = aiosql.from_path("sql/crud.sql", DatabasesAdapter)
+queries = aiosql.from_path("sql/crud.sql", "psycopg")
 waypointsField = Field(
     ...,
     description="List of tuples containing 3 floats: lat, lon and elevation",
@@ -35,12 +36,64 @@ waypointsField = Field(
 )
 
 
-async def assert_trek_owner(db: Database, trek_id: int, user_id: int) -> None:
+class Queries:
+    queries = aiosql.from_path("sql/crud.sql", "psycopg")
+
+    def __init__(self, db: Connection = Depends(get_db)):
+        self.db = db
+
+    def create_schema(self):  ##
+        return self.queries.create_schema(self.db)
+
+    def add_trek(self):  # <!
+        return self.queries.add_trek(self.db)
+
+    def add_leg(self):  # <!
+        return self.queries.add_leg(self.db)
+
+    def add_waypoints(self):  # *!
+        return self.queries.add_waypoints(self.db)
+
+    def add_trek_user(self):  #
+        return self.queries.add_trek_user(self.db)
+
+    def prev_adder_id(self):  # $
+        return self.queries.prev_adder_id(self.db)
+
+    def get_last_waypoint_for_leg(self):  # ^
+        return self.queries.get_last_waypoint_for_leg(self.db)
+
+    def start_leg(self):  #!
+        return self.queries.start_leg(self.db)
+
+    def get_trek(self):  # ^
+        return self.queries.get_trek(self.db)
+
+    def get_legs_for_trek(self):  #
+        return self.queries.get_legs_for_trek(self.db)
+
+    def get_treks_owner_of(self):  # $
+        return self.queries.get_treks_owner_of(self.db)
+
+    def get_treks_user_in(self):  # $
+        return self.queries.get_treks_user_in(self.db)
+
+    def delete_trek(self):  #!
+        return self.queries.delete_trek(self.db)
+
+    def is_trek_owner(self):  # $
+        return self.queries.is_trek_owner(self.db)
+
+    def is_trek_participant(self):  # $
+        return self.queries.is_trek_participant(self.db)
+
+
+async def assert_trek_owner(db: Connection, trek_id: int, user_id: int) -> None:
     if not await queries.is_trek_owner(db, trek_id=trek_id, user_id=user_id):
         raise HTTPException(status_code=403, detail="Forbidden")
 
 
-async def assert_trek_participant(db: Database, trek_id: int, user_id: int) -> None:
+async def assert_trek_participant(db: Connection, trek_id: int, user_id: int) -> None:
     if not await queries.is_trek_participant(db, trek_id=trek_id, user_id=user_id):
         raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -70,7 +123,7 @@ class GenerateInviteResponse(BaseModel):
 )
 async def generate_trek_invite(
     trek_id: int,
-    db: Database = Depends(get_db),
+    db: Connection = Depends(get_db),
     Authorize: AuthJWT = Depends(),
 ):
     user_id = Authorize.get_jwt_subject()
@@ -82,7 +135,7 @@ async def generate_trek_invite(
 @router.get("/join/{encrypted_trek_id}/", operation_id="authorize")
 async def add_user_to_trek(
     encrypted_trek_id: str,
-    db: Database = Depends(get_db),
+    db: Connection = Depends(get_db),
     Authorize: AuthJWT = Depends(),
 ):
     trek_id = decrypt_id(encrypted_trek_id)
@@ -97,21 +150,21 @@ async def add_user_to_trek(
     return Response(status_code=201)
 
 
-class AddRequest(BaseModel):
+class AddTrekRequest(BaseModel):
     origin: str
     destination: str
     waypoints: list = waypointsField
 
 
-class AddResponse(BaseModel):
+class AddTrekResponse(BaseModel):
     trek_id: int
     leg_id: int
 
 
-@router.post("/", response_model=AddResponse, operation_id="authorize")
+@router.post("/", response_model=AddTrekResponse, operation_id="authorize")
 async def add_trek(
-    request: AddRequest,
-    db: Database = Depends(get_db),
+    request: AddTrekRequest,
+    db: Connection = Depends(get_db),
     Authorize: AuthJWT = Depends(),
 ):
     user_id = Authorize.get_jwt_subject()
@@ -148,7 +201,7 @@ class GetResponse(BaseModel):
 @router.get("/{trek_id}", response_model=GetResponse, operation_id="authorize")
 async def get_trek(
     trek_id: int,
-    db: Database = Depends(get_db),
+    db: Connection = Depends(get_db),
     Authorize: AuthJWT = Depends(),
 ):
     user_id = Authorize.get_jwt_subject()
@@ -158,6 +211,12 @@ async def get_trek(
     legs = await queries.get_legs_for_trek(db, trek_id=trek_id)
     record = GetResponse(legs=legs, is_owner=is_owner, **trek_data)
     return record
+
+
+class EditTrekRequest(BaseModel):
+    progress_at_hour: t.Annotated[int, Field(ge=0, le=23)]
+    progress_at_tz: str
+    #  FIXME this has no endpoint
 
 
 class AddLegRequest(BaseModel):
@@ -174,10 +233,10 @@ class AddLegResponse(BaseModel):
     operation_id="authorize",
     response_model=AddLegResponse,
 )
-async def add_leg(
+async def edit_trek(
     trek_id: int,
     request: AddLegRequest,
-    db: Database = Depends(get_db),
+    db: Connection = Depends(get_db),
     Authorize: AuthJWT = Depends(),
 ):
     user_id = Authorize.get_jwt_subject()
@@ -251,7 +310,7 @@ def waypoint_tuple_to_dicts(
 @router.delete("/{trek_id}", operation_id="authorize")
 async def delete_trek(
     trek_id: int,
-    db: Database = Depends(get_db),
+    db: Connection = Depends(get_db),
     Authorize: AuthJWT = Depends(),
 ):
     user_id = Authorize.get_jwt_subject()

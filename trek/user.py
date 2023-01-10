@@ -8,7 +8,7 @@ import urllib.parse
 import uuid
 
 import aiosql
-from databases import Database
+from asyncpg import Connection
 from fastapi import APIRouter, Depends
 from fastapi.responses import RedirectResponse
 from fastapi_jwt_auth import AuthJWT
@@ -17,11 +17,11 @@ from pydantic import BaseModel, HttpUrl
 
 from trek import trackers
 from trek.crud import queries as crud_queries
-from trek.database import DatabasesAdapter, get_db
-from trek.trackers._tracker_utils import queries as tracker_queries
+from trek.database import get_db
+from trek.trackers.tracker_utils import queries as tracker_queries
 
 log = logging.getLogger(__name__)
-queries = aiosql.from_path("sql/user.sql", DatabasesAdapter)
+queries = aiosql.from_path("sql/user.sql", "psycopg")
 router = APIRouter(prefix="/user", tags=["users"])
 
 
@@ -140,7 +140,7 @@ async def handle_redirect(
     return RedirectResponse(redirect_url)
 
 
-async def add_user(db: Database) -> int:
+async def add_user(db: Connection) -> int:
     user_record = await queries.add_user(db, is_admin=False)
     user_id = user_record["user_id"]
     return user_id
@@ -155,7 +155,7 @@ class MeResponse(BaseModel):
 
 
 @router.get("/me", response_model=MeResponse, operation_id="authorize")
-async def me(db: Database = Depends(get_db), Authorize: AuthJWT = Depends()):
+async def me(db: Connection = Depends(get_db), Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
     user_id = Authorize.get_jwt_subject()
     token_strings = await tracker_queries.tokens_for_user(db, user_id=user_id)

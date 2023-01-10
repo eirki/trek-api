@@ -1,4 +1,4 @@
-from databases import Database
+from asyncpg import Connection
 from ward import test
 
 from tests import conftest
@@ -32,7 +32,7 @@ class FakeUser:
         pass
 
 
-async def _preadd_users(db: Database) -> list[int]:
+async def _preadd_users(db: Connection) -> list[int]:
     sql = """insert into
             user_ (is_admin)
         values

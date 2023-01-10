@@ -5,14 +5,14 @@ import json
 import logging
 import typing as t
 
-from databases import Database
+from asyncpg import Connection
 import fitbit
 from fitbit import Fitbit as FitbitApi
 from fitbit.api import FitbitOauth2Client
 import pendulum
 
 from trek import config
-from trek.trackers._tracker_utils import queries
+from trek.trackers.tracker_utils import queries
 
 log = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class FitbitUser:
 
     def __init__(
         self,
-        db: Database,
+        db: Connection,
         user_id: int,
         token: FitbitToken,
     ):

@@ -1,9 +1,10 @@
 import datetime as dt
 
+from asyncpg import Connection
 from asyncpg.exceptions import UniqueViolationError
-from databases import Database
 from freezegun import freeze_time
 import pendulum
+from psycopg.rows import dict_row
 from ward import fixture, raises, test
 
 from tests import conftest
@@ -54,7 +55,7 @@ def example_waypoints(trek_id: int, leg_id: int) -> list[dict]:
     ]
 
 
-async def _preadd_users(db: Database) -> list[int]:
+async def _preadd_users(db: Connection) -> list[int]:
     sql = """insert into
             user_ (is_admin)
         values
@@ -68,7 +69,7 @@ async def _preadd_users(db: Database) -> list[int]:
     return as_int
 
 
-async def _preadd_treks(db: Database, user_ids: list[int]) -> int:
+async def _preadd_treks(db: Connection, user_ids: list[int]) -> int:
     trek_record = await crud.queries.add_trek(
         db, origin="testOrigin", owner_id=user_ids[0]
     )
@@ -106,8 +107,76 @@ async def _preadd_treks(db: Database, user_ids: list[int]) -> int:
     return trek_id
 
 
-@test("test_add ")
-async def test_add(
+if True:
+    import asyncio
+
+    import asyncpg
+    import psycopg
+    from testcontainers.postgres import PostgresContainer
+    from ward import fixture
+
+    from trek import crud, main, user, utils
+
+
+@fixture(scope="global")
+async def fix():
+    with PostgresContainer(image="postgres:13.3") as postgres:
+        db_uri = postgres.get_connection_url().replace("+psycopg2", "")
+        # yield db_test_uri
+        async with await psycopg.AsyncConnection.connect(
+            db_uri, row_factory=dict_row
+        ) as db:
+            async with db.transaction(force_rollback=True):
+                yield db
+
+
+@fixture
+async def fax(db_url=fix):
+    async with await psycopg.AsyncConnection.connect(db_url) as db:
+        async with db.transaction(force_rollback=True):
+            await crud.queries.create_schema(db)
+            yield db
+    # await test_database.close()
+
+
+@test("blarg")
+async def blarg(test_database=fax):
+    # loop = asyncio.get_event_loop()
+    res = await test_database.execute("SELECT 1")
+    res = await res.fetchone()
+    # yield test_database
+
+    assert res is None
+
+
+@test("blorg")
+async def blorg(db=fix):
+    # with PostgresContainer(image="postgres:13.3") as postgres:
+    # db_uri = postgres.get_connection_url().replace("+psycopg2", "")
+    # test_database = await asyncpg.connect(dsn=db_uri)
+    await user.queries.create_schema(db)
+    await crud.queries.add_trek(db)
+    async with db.cursor() as acur:
+        await acur.execute("SELECT * from user_")
+        res = await acur.fetchone()
+        # will return (1, 100, "abc'def")
+        async for record in acur:
+            print(record)
+            # async with test_database.transaction(force_rollback=True):
+            #     # yield test_database
+            #     # res = await test_database.fetchone("SELECT 1")
+            #     await test_database.execute("SELECT 1")
+            #     await acur.execute("SELECT * FROM test")
+            #     await acur.fetchone()
+            #     # will return (1, 100, "abc'def")
+            #     async for record in acur:
+            #         print(record)
+            #     res = await test_database.fetchone()
+    assert res is None
+
+
+@test("test_add_trek")
+async def test_add_trek(
     db=connect_db,
     _a=freeze,
     _b=conftest.overide(conftest.auth_overrides()),
@@ -127,7 +196,14 @@ async def test_add(
     assert response.json() == {"trek_id": 1, "leg_id": 1}
     assert response.status_code == 200, response.text
     res = await all_rows_in_table(db, "trek")
-    exp = [{"id": 1, "origin": "testOrigin", "owner_id": 1}]
+    exp = [
+        {
+            "id": 1,
+            "origin": "testOrigin",
+            "owner_id": 1,
+            "progress_at": "12:00:00 CET",
+        }
+    ]
     assert res == exp
 
     res = await all_rows_in_table(db, "trek_user")
@@ -259,7 +335,14 @@ async def test_delete(
     res = await all_rows_in_table(db, "trek_user")
     assert res == []
     res = await all_rows_in_table(db, "trek")
-    exp = [{"id": 2, "origin": "testOrigin2", "owner_id": 2}]
+    exp = [
+        {
+            "id": 2,
+            "origin": "testOrigin2",
+            "owner_id": 2,
+            "progress_at": "12:00:00 CET",
+        }
+    ]
     assert res == exp
 
 

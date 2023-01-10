@@ -4,7 +4,7 @@ import asyncio
 import json
 import typing as t
 
-from databases import Database
+from asyncpg import Connection
 import pendulum
 from withings_api import AuthScope, WithingsApi, WithingsAuth
 from withings_api.common import (
@@ -14,7 +14,7 @@ from withings_api.common import (
 )
 
 from trek import config
-from trek.trackers._tracker_utils import queries
+from trek.trackers.tracker_utils import queries
 
 WithingsToken = dict
 # class WithingsToken(t.TypedDict):
@@ -29,7 +29,7 @@ class WithingsUser:
 
     def __init__(
         self,
-        db: Database,
+        db: Connection,
         user_id: int,
         token: WithingsToken,
     ):
