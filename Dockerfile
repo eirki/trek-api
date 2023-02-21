@@ -20,6 +20,4 @@ COPY requirements.txt ./requirements.txt
 RUN .venv/bin/pip install -r ./requirements.txt
 
 COPY trek ./trek
-COPY sql ./sql
-COPY frontend ./frontend
 COPY justfile ./justfile

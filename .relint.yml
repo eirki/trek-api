@@ -1,7 +1,7 @@
 - name: trigger ZeroDivisionError
-  pattern: 1\s*/\s*0
+  pattern: 1 / 0
   filePattern: .*\.py
 - name: fixme comment
-  pattern: '# FIXME'
-  hint: 'Resolve FIXMEs before commiting'
+  pattern: "# FIXME"
+  hint: "Resolve FIXMEs before commiting"
   filePattern: .*\.py

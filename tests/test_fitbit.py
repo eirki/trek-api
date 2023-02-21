@@ -1,31 +1,24 @@
 from dataclasses import dataclass
 import json
 
-from asyncpg import Connection
+import pyarrow as pa
 from ward import test
 
-from tests.conftest import connect_db
-from trek.trackers.fitbit_ import FitbitUser
+from tests.testing_utils import test_db
+from trek.core.trackers.fitbit_ import FitbitUser
+from trek.database import Database, user_schema
+from trek.models import Id, User, UserToken
 
 
-async def _preadd_users(db: Connection) -> list[int]:
-    sql = """insert into
-            user_ (is_admin)
-        values
-            (:is_admin);
-        """
-    await db.execute_many(
-        sql,
-        values=[{"is_admin": False}] * 3,
-    )
-    user_ids = await db.fetch_all("select id from user_")
-    assert len(user_ids) > 0
-    as_int = [user["id"] for user in user_ids]
-    assert all(isinstance(user_id, int) for user_id in as_int)
-    return as_int
+def _preadd_users(db: Database) -> list[Id]:
+    user_records = [{"id": db.make_id()} for _ in range(3)]
+    table = pa.Table.from_pylist(user_records, schema=user_schema)
+    db.save_table(User, table)
+    user_ids = [user["id"] for user in user_records]
+    return user_ids
 
 
-def fake_token(user_id: int) -> dict:
+def fake_token(user_id: Id) -> dict:
     return {
         "user_id": f"fb{user_id}",
         "access_token": f"access_token{user_id}",
@@ -36,29 +29,31 @@ def fake_token(user_id: int) -> dict:
 
 @dataclass
 class FakeService:
-    db: Connection
-    user_id: int
+    db: Database
+    user_id: Id
 
 
 @test("test_persist_token ")
-async def test_persist_token(db=connect_db):
-    user_ids = await _preadd_users(db)
-    token_in = fake_token(user_id=user_ids[0])
-    fake_service = FakeService(db=db, user_id=user_ids[0])
-    await FitbitUser.persist_token(fake_service, token=token_in)  # type: ignore
-    tokens = await db.fetch_all("select * from user_token")
-    assert len(tokens) == 1
-    token_table = dict(tokens[0])
-    token_table["token"] = json.loads(token_table["token"])
+def test_persist_token(db: Database = test_db):
+    user_ids = _preadd_users(db)
+    user_id = user_ids[0]
+    token_in = fake_token(user_id=user_id)
+    fake_service = FakeService(db=db, user_id=user_id)
+    FitbitUser.persist_token(fake_service, token=token_in)  # type: ignore
+    user_tokens = db.load_records(UserToken)
+    assert len(user_tokens) == 1
+    token_record = user_tokens[0]
+    token = json.loads(token_record.pop("token"))  # type: ignore
     exp = {
-        "token": {
-            "access_token": "access_token1",
-            "expires_at": 1573921366.6757,
-            "refresh_token": "refresh_token1",
-            "user_id": "fb1",
-        },
-        "tracker": "fitbit",
-        "tracker_user_id": "fitbit_fb1",
-        "user_id_": 1,
+        "user_id": "00000000000000000000000000000000",
+        "tracker_name": "fitbit",
+        "tracker_user_id": "fitbit_fb00000000000000000000000000000000",
     }
-    assert token_table == exp
+    assert token_record == exp
+    token_exp = {
+        "user_id": "fb00000000000000000000000000000000",
+        "access_token": "access_token00000000000000000000000000000000",
+        "refresh_token": "refresh_token00000000000000000000000000000000",
+        "expires_at": 1573921366.6757,
+    }
+    assert token == token_exp

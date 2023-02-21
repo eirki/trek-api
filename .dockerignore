@@ -1,3 +1,7 @@
+.git
+.venv
+htmlcov
+*__pycache__
 *.pyxbldc
 .idea
 

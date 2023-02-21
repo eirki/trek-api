@@ -3,6 +3,7 @@ black
 flake8
 flake8-debugger
 flake8-print
+flake8-fixme
 ipykernel
 isort
 mypy
@@ -10,11 +11,6 @@ pre-commit
 relint
 ward
 coverage
-async-asgi-testclient
-urllib3
-requests
-testcontainers[postgresql]
-nest-asyncio
 freezegun
 types-freezegun
-sqlfluff
+nest_asyncio

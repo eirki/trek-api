@@ -1,15 +1,65 @@
 import datetime as dt
 
-from asyncpg import Connection
-from asyncpg.exceptions import UniqueViolationError
 from freezegun import freeze_time
 import pendulum
-from psycopg.rows import dict_row
+import pyarrow as pa
+import pyarrow.compute as pc
 from ward import fixture, raises, test
 
-from tests import conftest
-from tests.conftest import all_rows_in_table, client, connect_db
-from trek import crud
+from tests.testing_utils import test_db
+from trek import exceptions as exc
+from trek.core import crud
+from trek.database import Database, trek_user_schema, user_schema, waypoint_schema
+from trek.models import Id, Leg, Trek, TrekUser, User, Waypoint
+
+# @test("flake")
+# def test_flake(db: Database = test_db):
+#     from tests.testing_utils import TestDatabase
+#     import tempfile
+#     from pathlib import Path
+
+#     for i in range(100):
+#         with tempfile.TemporaryDirectory() as temp_dir:
+#             db = TestDatabase(Path(temp_dir))
+
+#             trek_record = {
+#                 "id": db.make_id(),
+#                 "is_active": False,
+#                 "owner_id": db.make_id(),
+#             }
+#             db.append_record(Trek, trek_record)
+
+#             other_trek_record = {
+#                 "id": db.make_id(),
+#                 "is_active": False,
+#                 "owner_id": db.make_id(),
+#             }
+#             db.append_record(Trek, other_trek_record)
+
+#             treks = db.load_table(Trek).to_pylist()
+#             sort = [
+#                 {
+#                     "id": "00000000000000000000000000000000",
+#                     "is_active": False,
+#                     "owner_id": "00000000000000000000000000000001",
+#                     "progress_at_hour": None,
+#                     "progress_at_tz": None,
+#                 },
+#                 {
+#                     "id": "00000000000000000000000000000002",
+#                     "is_active": False,
+#                     "owner_id": "00000000000000000000000000000003",
+#                     "progress_at_hour": None,
+#                     "progress_at_tz": None,
+#                 },
+#             ]
+#             assert treks == sort
+#             # if treks != sort:
+#             #     print(i)
+#             #     breakpoint()
+#             #     break
+#             #     1 + 1
+#     # 1  /  0
 
 
 @fixture
@@ -18,463 +68,464 @@ def freeze():
         yield
 
 
-def example_waypoints(trek_id: int, leg_id: int) -> list[dict]:
+def example_waypoints(db: Database, trek_id: Id, leg_id: Id) -> list[Waypoint]:
     return [
         {
+            "id": db.make_id(),
             "trek_id": trek_id,
             "leg_id": leg_id,
             "lat": 10.671114,
             "lon": 59.332889,
-            "elevation": 18.35,
             "distance": 0.0,
         },
         {
+            "id": db.make_id(),
             "trek_id": trek_id,
             "leg_id": leg_id,
             "lat": 10.671664,
             "lon": 59.333243,
-            "elevation": 18.31,
             "distance": 72.11886064837488,
         },
         {
+            "id": db.make_id(),
             "trek_id": trek_id,
             "leg_id": leg_id,
             "lat": 10.671857,
             "lon": 59.333329,
-            "elevation": 18.32,
             "distance": 95.44853837588332,
         },
         {
+            "id": db.make_id(),
             "trek_id": trek_id,
             "leg_id": leg_id,
             "lat": 10.672099,
             "lon": 59.333292,
-            "elevation": 17.51,
             "distance": 122.52108499023316,
         },
     ]
 
 
-async def _preadd_users(db: Connection) -> list[int]:
-    sql = """insert into
-            user_ (is_admin)
-        values
-            (:is_admin);
-        """
-    await db.execute_many(sql, values=[{"is_admin": False}] * 3)
-    user_ids = await db.fetch_all("select id from user_")
-    assert len(user_ids) > 0
-    as_int = [user["id"] for user in user_ids]
-    assert all(isinstance(user_id, int) for user_id in as_int)
-    return as_int
+def _preadd_users(db: Database) -> list[Id]:
+    user_records = [{"id": db.make_id()} for _ in range(3)]
+    table = pa.Table.from_pylist(user_records, schema=user_schema)
+    db.save_table(User, table)
+    user_ids = [user["id"] for user in user_records]
+    return user_ids
 
 
-async def _preadd_treks(db: Connection, user_ids: list[int]) -> int:
-    trek_record = await crud.queries.add_trek(
-        db, origin="testOrigin", owner_id=user_ids[0]
-    )
-    trek_id = trek_record["id"]
-    leg_record = await crud.queries.add_leg(
-        db,
-        trek_id=trek_id,
-        destination="testDestination",
-        added_at=pendulum.datetime(2015, 2, 5, 12, 30, 5),
-        added_by=user_ids[0],
-    )
+def _preadd_treks(
+    db: Database, user_ids: list[Id], leg_is_finished=False, trek_is_active=False
+) -> Id:
+    trek_id = db.make_id()
+    trek_record = {
+        "id": trek_id,
+        "is_active": trek_is_active,
+        "owner_id": user_ids[0],
+    }
+    db.append_record(Trek, trek_record)
+
+    leg_record = {
+        "id": db.make_id(),
+        "trek_id": trek_id,
+        "destination": "testDestination",
+        "added_at": pendulum.datetime(2000, 2, 5, 12, 30, 5),
+        "added_by": user_ids[0],
+        "is_finished": leg_is_finished,
+    }
     leg_id = leg_record["id"]
-    await crud.queries.start_leg(db, id=leg_id)
+    db.append_record(Leg, leg_record)
 
-    waypoints = example_waypoints(trek_id, leg_id)
-    await crud.queries.add_waypoints(db, waypoints)
+    waypoint_records = example_waypoints(db, trek_id, leg_id)
+    waypoints_table = pa.Table.from_pylist(waypoint_records, schema=waypoint_schema)
+    db.save_table(Waypoint, waypoints_table)
 
-    other_trek_record = await crud.queries.add_trek(
-        db, origin="testOrigin2", owner_id=user_ids[1]
+    other_trek_id = db.make_id()
+    other_trek_record = {
+        "id": other_trek_id,
+        "is_active": False,
+        "owner_id": user_ids[1],
+    }
+    db.append_record(Trek, other_trek_record)
+    other_leg_id = db.make_id()
+    other_leg_record = {
+        "id": other_leg_id,
+        "trek_id": other_trek_id,
+        "destination": "testDestination",
+        "added_at": pendulum.datetime(2000, 2, 5, 12, 30, 5),
+        "added_by": user_ids[1],
+        "is_finished": False,
+    }
+    db.append_record(Leg, other_leg_record)
+    other_waypoint_records = example_waypoints(db, other_trek_id, other_leg_id)
+    other_waypoints_table = pa.Table.from_pylist(
+        other_waypoint_records, schema=waypoint_schema
     )
-    other_trek_id = other_trek_record["id"]
-    await crud.queries.add_leg(
-        db,
-        trek_id=other_trek_id,
-        destination="testDestination2",
-        added_at=pendulum.datetime(2015, 2, 6, 12, 30, 5),
-        added_by=user_ids[1],
-    )
+    db.save_table(Waypoint, other_waypoints_table)
 
-    for user_id in user_ids[0:2]:
-        now = dt.datetime.fromtimestamp(pendulum.now().timestamp(), pendulum.tz.UTC)
-        await crud.queries.add_trek_user(
-            db, trek_id=trek_id, user_id=user_id, added_at=now
-        )
+    trek_user_records = [
+        {
+            "trek_id": trek_id,
+            "user_id": user_id,
+            "added_at": pendulum.datetime(2000, 2, 5, 12, 30, 5),
+        }
+        for user_id in user_ids[0:2]
+    ]
+    trek_users_table = pa.Table.from_pylist(trek_user_records, schema=trek_user_schema)
+    db.save_table(TrekUser, trek_users_table)
     return trek_id
 
 
-if True:
-    import asyncio
-
-    import asyncpg
-    import psycopg
-    from testcontainers.postgres import PostgresContainer
-    from ward import fixture
-
-    from trek import crud, main, user, utils
-
-
-@fixture(scope="global")
-async def fix():
-    with PostgresContainer(image="postgres:13.3") as postgres:
-        db_uri = postgres.get_connection_url().replace("+psycopg2", "")
-        # yield db_test_uri
-        async with await psycopg.AsyncConnection.connect(
-            db_uri, row_factory=dict_row
-        ) as db:
-            async with db.transaction(force_rollback=True):
-                yield db
-
-
-@fixture
-async def fax(db_url=fix):
-    async with await psycopg.AsyncConnection.connect(db_url) as db:
-        async with db.transaction(force_rollback=True):
-            await crud.queries.create_schema(db)
-            yield db
-    # await test_database.close()
-
-
-@test("blarg")
-async def blarg(test_database=fax):
-    # loop = asyncio.get_event_loop()
-    res = await test_database.execute("SELECT 1")
-    res = await res.fetchone()
-    # yield test_database
-
-    assert res is None
-
-
-@test("blorg")
-async def blorg(db=fix):
-    # with PostgresContainer(image="postgres:13.3") as postgres:
-    # db_uri = postgres.get_connection_url().replace("+psycopg2", "")
-    # test_database = await asyncpg.connect(dsn=db_uri)
-    await user.queries.create_schema(db)
-    await crud.queries.add_trek(db)
-    async with db.cursor() as acur:
-        await acur.execute("SELECT * from user_")
-        res = await acur.fetchone()
-        # will return (1, 100, "abc'def")
-        async for record in acur:
-            print(record)
-            # async with test_database.transaction(force_rollback=True):
-            #     # yield test_database
-            #     # res = await test_database.fetchone("SELECT 1")
-            #     await test_database.execute("SELECT 1")
-            #     await acur.execute("SELECT * FROM test")
-            #     await acur.fetchone()
-            #     # will return (1, 100, "abc'def")
-            #     async for record in acur:
-            #         print(record)
-            #     res = await test_database.fetchone()
-    assert res is None
-
-
 @test("test_add_trek")
-async def test_add_trek(
-    db=connect_db,
-    _a=freeze,
-    _b=conftest.overide(conftest.auth_overrides()),
-):
-    await _preadd_users(db)
-    response = await client.post(
-        "/trek/",
-        json={
-            "origin": "testOrigin",
-            "waypoints": [
-                [10.681114, 59.352889, 18.35],
-                [10.681664, 59.353243, 18.31],
-            ],
-            "destination": "testDestination",
-        },
+def test_add_trek(db=test_db, _=freeze):
+    request = crud.AddTrekRequest(
+        progress_at_hour=12,
+        progress_at_tz="CET",
+        output_to="discord",
+        polyline="skc`AapciJiw@oyBmBeA",
     )
-    assert response.json() == {"trek_id": 1, "leg_id": 1}
-    assert response.status_code == 200, response.text
-    res = await all_rows_in_table(db, "trek")
-    exp = [
+    user_id = db.make_id()
+    response = crud.add_trek(request, db, user_id)
+    assert response.dict() == {"trek_id": "00000000000000000000000000000001"}
+
+    treks = db.load_table(Trek).to_pylist()
+    treks_exp = [
         {
-            "id": 1,
-            "origin": "testOrigin",
-            "owner_id": 1,
-            "progress_at": "12:00:00 CET",
+            "id": "00000000000000000000000000000001",
+            "is_active": False,
+            "owner_id": "00000000000000000000000000000000",
+            "progress_at_hour": 12,
+            "progress_at_tz": "CET",
+            "output_to": "discord",
+        },
+    ]
+    assert treks == treks_exp
+
+    trek_users = db.load_table(TrekUser).to_pylist()
+    trek_users_exp = [
+        {
+            "trek_id": "00000000000000000000000000000001",
+            "user_id": "00000000000000000000000000000000",
+            "added_at": dt.datetime(2012, 1, 14, 0, 0),  # tzinfo=dt.timezone.utc,
+            "color": "#2cb",
+        },
+    ]
+
+    assert trek_users == trek_users_exp
+
+    legs = db.load_table(Leg).to_pylist()
+    assert legs == [
+        {
+            "id": "00000000000000000000000000000002",
+            "trek_id": "00000000000000000000000000000001",
+            "added_at": dt.datetime(2012, 1, 14),
+            "added_by": "00000000000000000000000000000000",
+            "is_finished": False,
         }
     ]
-    assert res == exp
-
-    res = await all_rows_in_table(db, "trek_user")
-
-    exp = [
-        {
-            "added_at": dt.datetime(2012, 1, 14, 0, 0, tzinfo=dt.timezone.utc),
-            "trek_id": 1,
-            "user_id": 1,
-        }
-    ]
-    assert res == exp
 
 
 @test("test_add_leg")
-async def test_add_leg(
-    db=connect_db,
-    _a=freeze,
-    _b=conftest.overide(conftest.auth_overrides(user_id=2)),
-):
-    user_ids = await _preadd_users(db)
-    trek_id = await _preadd_treks(db, user_ids)
-    legs = await crud.queries.get_legs_for_trek(db, trek_id=trek_id)
-    prev_lev = legs[-1]
-    await db.execute(
-        "update leg set is_ongoing = false where leg.id = :id",
-        values={"id": prev_lev["id"]},
-    )
+def test_add_leg(db=test_db, _=freeze):
+    user_ids = _preadd_users(db)
+    user_id = user_ids[1]
+    trek_id = _preadd_treks(db, user_ids, leg_is_finished=True)
 
-    response = await client.post(
-        f"/trek/{trek_id}",
-        json={
-            "destination": "legDestination",
-            "waypoints": [
-                [10.672099, 59.333292, 17.51],
-                [10.681114, 59.352889, 18.35],
-                [10.681664, 59.353243, 18.31],
-            ],
-        },
-    )
-    assert response.status_code == 200, response.text
+    assert db.load_table(Leg).num_rows == 2
 
-    res = await all_rows_in_table(db, "leg")
-    exp = {
-        "destination": "legDestination",
-        "id": 3,
-        "is_ongoing": True,
-        "added_at": dt.datetime.fromtimestamp(
-            pendulum.now().timestamp(), pendulum.tz.UTC
-        ),
-        "added_by": 2,
-        "trek_id": 1,
+    request = crud.AddLegRequest(polyline="skc`AapciJiw@oyBmBeA")
+    response = crud.add_leg(trek_id, request, db, user_id).dict()
+    assert response == {"leg_id": "0000000000000000000000000000000f"}
+
+    leg_records = db.load_table(Leg).to_pylist()
+    assert len(leg_records) == 3
+    assert leg_records[-1] == {
+        "added_at": dt.datetime(2012, 1, 14, 0, 0),
+        "added_by": "00000000000000000000000000000001",
+        "id": "0000000000000000000000000000000f",
+        "is_finished": False,
+        "trek_id": "00000000000000000000000000000003",
     }
 
-    assert res[-1] == exp
-
-    res2 = await all_rows_in_table(db, "waypoint")
-    exp2 = [
+    waypoint_records = db.load_table(
+        Waypoint,
+        filter=(
+            (pc.field("trek_id") == pc.scalar(trek_id))
+            & (pc.field("leg_id") == pc.scalar(response["leg_id"]))
+        ),
+    ).to_pylist()
+    assert waypoint_records == [
         {
-            "id": 6,
-            "distance": 2364.5557187057007,
-            "elevation": 18.35,
-            "lat": 10.681114,
-            "leg_id": 3,
-            "trek_id": 1,
-            "lon": 59.352889,
+            "id": "00000000000000000000000000000010",
+            "trek_id": "00000000000000000000000000000003",
+            "leg_id": "0000000000000000000000000000000f",
+            "lat": 10.6721,
+            "lon": 59.33329,
+            "distance": 0.0,
         },
         {
-            "id": 7,
-            "distance": 2436.673932181354,
-            "elevation": 18.31,
-            "lat": 10.681664,
-            "leg_id": 3,
-            "trek_id": 1,
-            "lon": 59.353243,
+            "id": "00000000000000000000000000000011",
+            "trek_id": "00000000000000000000000000000003",
+            "leg_id": "0000000000000000000000000000000f",
+            "lat": 10.68111,
+            "lon": 59.35289,
+            "distance": 2364.62,
+        },
+        {
+            "id": "00000000000000000000000000000012",
+            "trek_id": "00000000000000000000000000000003",
+            "leg_id": "0000000000000000000000000000000f",
+            "lat": 10.68166,
+            "lon": 59.35324,
+            "distance": 2436.5,
         },
     ]
-    assert res2[-2:] == exp2
+
+
+@test("test_assert_no_unfinished_leg")
+def test_assert_no_unfinished_leg(db=test_db):
+    user_ids = _preadd_users(db)
+    _preadd_treks(db, user_ids)
+    leg_table = db.load_table(Leg)
+    with raises(exc.ServerException) as ctx:
+        crud._assert_no_unfinished_leg(leg_table)
+    assert ctx.raised.model.dict() == {
+        "detail": "Trek has unfinished leg",
+        "error_code": "E101Error",
+        "message": "Server error occured",
+        "status_code": 400,
+    }
+
+
+@test("test_assert_is_next_leg_adder_fails")
+def test_assert_is_next_leg_adder_fails(db=test_db):
+    user_ids = _preadd_users(db)
+    user_id = user_ids[0]
+    trek_id = _preadd_treks(db, user_ids)
+    leg_table = db.load_table(Leg, filter=pc.field("trek_id") == pc.scalar(trek_id))
+    trek_users = db.load_records(
+        TrekUser, filter=pc.field("trek_id") == pc.scalar(trek_id)
+    )
+    with raises(exc.ServerException) as ctx:
+        crud._assert_is_next_leg_adder(trek_users, leg_table, user_id)
+    assert ctx.raised.model.dict() == {
+        "detail": "User is not in line to add leg",
+        "error_code": "E101Error",
+        "message": "Server error occured",
+        "status_code": 400,
+    }
+
+
+@test("test_assert_is_next_leg_adder")
+def test_assert_is_next_leg_adder(db=test_db):
+    user_ids = _preadd_users(db)
+    user_id = user_ids[1]
+    trek_id = _preadd_treks(db, user_ids)
+    leg_table = db.load_table(Leg, filter=pc.field("trek_id") == pc.scalar(trek_id))
+    trek_users = db.load_records(
+        TrekUser, filter=pc.field("trek_id") == pc.scalar(trek_id)
+    )
+    crud._assert_is_next_leg_adder(trek_users, leg_table, user_id)
+
+
+@test("test_assert_waypoints_connect")
+def test_assert_waypoints_connect(db=test_db):
+    user_ids = _preadd_users(db)
+    trek_id = _preadd_treks(db, user_ids)
+    leg_table = db.load_table(Leg, filter=pc.field("trek_id") == pc.scalar(trek_id))
+    new_waypoints = [(1.672099, 59.333292, 17.51), (2.672099, 59.333292, 17.51)]
+    with raises(exc.ServerException) as ctx:
+        crud._assert_waypoints_connect(db, leg_table, trek_id, new_waypoints)
+    assert ctx.raised.model.dict() == {
+        "detail": "Leg does not start where last ended - (10, 59) vs (1, 59)",
+        "error_code": "E101Error",
+        "message": "Server error occured",
+        "status_code": 400,
+    }
 
 
 @test("test_get")
-async def test_get(
-    db=connect_db,
-    _=conftest.overide(conftest.auth_overrides()),
-):
-    user_ids = await _preadd_users(db)
-    trek_id = await _preadd_treks(db, user_ids)
-
-    response = await client.get(f"/trek/{trek_id}")
-    res = response.json()
+def test_get(db=test_db):
+    user_ids = _preadd_users(db)
+    trek_id = _preadd_treks(db, user_ids)
+    user_id = user_ids[0]
+    response = crud.get_trek(trek_id, db, user_id)
+    trek_record = response.dict()
     exp = {
+        "can_add_leg": False,
+        "current_location": None,
+        "is_active": False,
         "is_owner": True,
-        "origin": "testOrigin",
-        "users": [1, 2],
         "legs": [
             {
-                "added_at": "2015-02-05T12:30:05+00:00",
-                "destination": "testDestination",
-                "id": 1,
-            }
+                "added_at": dt.datetime(2000, 2, 5, 12, 30, 5),
+                "added_by": "00000000000000000000000000000000",
+                "id": "00000000000000000000000000000004",
+                "is_finished": False,
+                "trek_id": "00000000000000000000000000000003",
+            },
+        ],
+        "users": [
+            "00000000000000000000000000000000",
+            "00000000000000000000000000000001",
         ],
     }
-    assert res == exp
-    assert response.status_code == 200, response.text
+    assert trek_record == exp
 
 
 @test("test_delete")
-async def test_delete(
-    db=connect_db,
-    _=conftest.overide(conftest.auth_overrides()),
-):
-    user_ids = await _preadd_users(db)
-    trek_id = await _preadd_treks(db, user_ids)
-    response = await client.delete(f"/trek/{trek_id}")
-    assert response.status_code == 200, response.text
-    res = await all_rows_in_table(db, "leg")
-    assert res == [
-        {
-            "added_at": dt.datetime(2015, 2, 6, 12, 30, 5, tzinfo=dt.timezone.utc),
-            "added_by": 2,
-            "destination": "testDestination2",
-            "id": 2,
-            "is_ongoing": False,
-            "trek_id": 2,
-        }
-    ]
-    res = await all_rows_in_table(db, "waypoint")
-    assert res == []
-    res = await all_rows_in_table(db, "trek_user")
-    assert res == []
-    res = await all_rows_in_table(db, "trek")
-    exp = [
-        {
-            "id": 2,
-            "origin": "testOrigin2",
-            "owner_id": 2,
-            "progress_at": "12:00:00 CET",
-        }
-    ]
-    assert res == exp
+def test_delete(db=test_db):
+    user_ids = _preadd_users(db)
+    user_id = user_ids[0]
+    trek_id = _preadd_treks(db, user_ids)
+    assert db.load_table(Trek).num_rows == 2
+    assert db.load_table(Leg).num_rows == 2
+    assert db.load_table(Waypoint).num_rows == 8
+    assert db.load_table(TrekUser).num_rows == 2
 
+    crud.delete_trek(trek_id, db, user_id)
 
-@test("test_two_ongoing_legs_fail")
-async def test_two_ongoing_legs_fail(db=connect_db):
-    user_ids = await _preadd_users(db)
-    trek_record = await crud.queries.add_trek(
-        db, origin="testOrigin", owner_id=user_ids[0]
-    )
-    trek_id = trek_record["id"]
-    leg_record = await crud.queries.add_leg(
-        db,
-        trek_id=trek_id,
-        destination="testDestination",
-        added_at=pendulum.datetime(2015, 2, 5, 12, 30, 5),
-        added_by=user_ids[0],
-    )
-    leg_id = leg_record["id"]
-    await crud.queries.start_leg(db, id=leg_id)
-
-    leg_record = await crud.queries.add_leg(
-        db,
-        trek_id=trek_id,
-        destination="testDestination2",
-        added_at=pendulum.datetime(2015, 2, 5, 12, 30, 5),
-        added_by=user_ids[1],
-    )
-    leg_id = leg_record["id"]
-    with raises(UniqueViolationError):
-        await crud.queries.start_leg(db, id=leg_id)
+    assert db.load_table(Trek).num_rows == 1
+    assert db.load_table(Leg).num_rows == 1
+    assert db.load_table(Waypoint).num_rows == 4
+    assert db.load_table(TrekUser).num_rows == 2
 
 
 @test("test_generate_invite")
-async def test_generate_invite(
-    db=connect_db,
-    _=conftest.overide(conftest.auth_overrides()),
-):
-    user_ids = await _preadd_users(db)
-    trek_id = await _preadd_treks(db, user_ids)
-    response = await client.get(f"/trek/invite/{trek_id}/")
-    res = response.json()
+def test_generate_invite(db=test_db):
+    user_ids = _preadd_users(db)
+    user_id = user_ids[0]
+    trek_id = _preadd_treks(db, user_ids)
+    response = crud.generate_trek_invite(trek_id, user_id, db)
+    res = response.dict()
     assert "invite_id" in res
-    decrypted_trek_id = crud.decrypt_id(res["invite_id"])
+    assert len(res["invite_id"]) == 188
+    decrypted_trek_id = crud._decrypt_id(res["invite_id"])
     assert trek_id == decrypted_trek_id
 
 
 @test("test_add_user_to_trek")
-async def test_add_user_to_trek(
-    db=connect_db,
-    _=conftest.overide(conftest.auth_overrides(user_id=4)),
-):
-    user_ids = await _preadd_users(db)
-    trek_id = await _preadd_treks(db, user_ids)
-    encrypted_trek_id = crud.encrypt_id(trek_id)
-    sql = """insert into
-            user_ (is_admin)
-        values
-            (:is_admin)
-        returning
-            id;
-        """
-    user_id = await db.fetch_val(sql, values={"is_admin": False})
-    assert user_id == 4  # ugly
-    response = await client.get(f"/trek/join/{encrypted_trek_id}/")
-    assert response.status_code == 201
-    records = await db.fetch_all(
-        "select user_id from trek_user where trek_id = :trek_id",
-        values={"trek_id": trek_id},
+def test_add_user_to_trek(db=test_db, _=freeze):
+    user_ids = _preadd_users(db)
+    user_id = user_ids[-1]
+    trek_id = _preadd_treks(db, user_ids)
+    encrypted_trek_id = crud._encrypt_id(trek_id)
+    trek_users_before = db.load_table(
+        TrekUser, filter=pc.field("trek_id") == pc.scalar(trek_id)
     )
-    trek_user_ids = [record["user_id"] for record in records]
-    assert 4 in trek_user_ids
-    response = await client.get(f"/trek/join/{encrypted_trek_id}/")
-    assert response.status_code == 200, response.text
+    assert trek_users_before.num_rows == 2
+
+    crud.add_user_to_trek(encrypted_trek_id, db, user_id)
+
+    trek_users = db.load_table(
+        TrekUser, filter=pc.field("trek_id") == pc.scalar(trek_id)
+    ).sort_by("added_at")
+    assert trek_users.num_rows == 3
+
+    res = trek_users.to_pylist()[-1]
+    exp = {
+        "added_at": dt.datetime(2012, 1, 14, 0, 0),
+        "trek_id": trek_id,
+        "user_id": user_id,
+        "color": "#639",
+    }
+    assert res == exp
 
 
-@test("next_leg_adder")
-async def test_next_leg_adder(
-    db=connect_db,
-    _=conftest.overide(conftest.auth_overrides(user_id=4)),
-):
-    user_ids = await _preadd_users(db)
-    trek_record = await crud.queries.add_trek(
-        db, origin="testOrigin", owner_id=user_ids[0]
-    )
-    trek_id = trek_record["id"]
-    for user_id in user_ids[0:2]:
-        now = dt.datetime.fromtimestamp(pendulum.now().timestamp(), pendulum.tz.UTC)
-        await crud.queries.add_trek_user(
-            db, trek_id=trek_id, user_id=user_id, added_at=now
-        )
+@test("test_activate_trek")
+def test_activate_trek(db=test_db):
+    user_ids = _preadd_users(db)
+    trek_id = _preadd_treks(db, user_ids)
+    user_id = user_ids[0]
+    trek_records_before = db.load_table(Trek).to_pylist()
 
-    leg_record = await crud.queries.add_leg(
-        db,
-        trek_id=trek_id,
-        destination="testDestination",
-        added_at=pendulum.datetime(2015, 2, 5, 12, 30, 5),
-        added_by=user_ids[0],
-    )
-    leg_id = leg_record["id"]
-    prev_adder_id = await crud.queries.prev_adder_id(db, leg_id=leg_id)
-    next_adder_id = await crud.queries.next_adder_id(
-        db, prev_adder_id=prev_adder_id, trek_id=trek_id
-    )
-    assert next_adder_id == user_ids[1]
+    assert trek_records_before == [
+        {
+            "id": "00000000000000000000000000000003",
+            "is_active": False,
+            "owner_id": "00000000000000000000000000000000",
+            "progress_at_hour": None,
+            "progress_at_tz": None,
+            "output_to": None,
+        },
+        {
+            "id": "00000000000000000000000000000009",
+            "is_active": False,
+            "owner_id": "00000000000000000000000000000001",
+            "progress_at_hour": None,
+            "progress_at_tz": None,
+            "output_to": None,
+        },
+    ]
+
+    crud.activate_trek(trek_id, user_id, db)
+
+    trek_records = db.load_table(Trek).to_pylist()
+
+    assert trek_records == [
+        {
+            "id": "00000000000000000000000000000003",
+            "is_active": True,
+            "owner_id": "00000000000000000000000000000000",
+            "progress_at_hour": None,
+            "progress_at_tz": None,
+            "output_to": None,
+        },
+        {
+            "id": "00000000000000000000000000000009",
+            "is_active": False,
+            "owner_id": "00000000000000000000000000000001",
+            "progress_at_hour": None,
+            "progress_at_tz": None,
+            "output_to": None,
+        },
+    ]
 
 
-@test("next_leg_adder_first")
-async def test_next_leg_adder_first(
-    db=connect_db,
-    _=conftest.overide(conftest.auth_overrides(user_id=4)),
-):
-    user_ids = await _preadd_users(db)
-    trek_record = await crud.queries.add_trek(
-        db, origin="testOrigin", owner_id=user_ids[0]
-    )
-    trek_id = trek_record["id"]
-    for user_id in user_ids[0:2]:
-        now = dt.datetime.fromtimestamp(pendulum.now().timestamp(), pendulum.tz.UTC)
-        await crud.queries.add_trek_user(
-            db, trek_id=trek_id, user_id=user_id, added_at=now
-        )
+@test("test_deactivate_trek")
+def test_deactivate_trek(db=test_db):
+    user_ids = _preadd_users(db)
+    trek_id = _preadd_treks(db, user_ids, trek_is_active=True)
+    user_id = user_ids[0]
+    trek_records_before = db.load_table(Trek).to_pylist()
 
-    leg_record = await crud.queries.add_leg(
-        db,
-        trek_id=trek_id,
-        destination="testDestination",
-        added_at=pendulum.datetime(2015, 2, 5, 12, 30, 5),
-        added_by=user_ids[1],
-    )
-    leg_id = leg_record["id"]
-    prev_adder_id = await crud.queries.prev_adder_id(db, leg_id=leg_id)
-    next_adder_id = await crud.queries.next_adder_id(
-        db, prev_adder_id=prev_adder_id, trek_id=trek_id
-    )
-    assert next_adder_id == user_ids[0]
+    assert trek_records_before == [
+        {
+            "id": "00000000000000000000000000000003",
+            "is_active": True,
+            "owner_id": "00000000000000000000000000000000",
+            "progress_at_hour": None,
+            "progress_at_tz": None,
+            "output_to": None,
+        },
+        {
+            "id": "00000000000000000000000000000009",
+            "is_active": False,
+            "owner_id": "00000000000000000000000000000001",
+            "progress_at_hour": None,
+            "progress_at_tz": None,
+            "output_to": None,
+        },
+    ]
+
+    crud.deactivate_trek(trek_id, user_id, db)
+
+    trek_records = db.load_table(Trek).to_pylist()
+
+    assert trek_records == [
+        {
+            "id": "00000000000000000000000000000003",
+            "is_active": False,
+            "owner_id": "00000000000000000000000000000000",
+            "progress_at_hour": None,
+            "progress_at_tz": None,
+            "output_to": None,
+        },
+        {
+            "id": "00000000000000000000000000000009",
+            "is_active": False,
+            "owner_id": "00000000000000000000000000000001",
+            "progress_at_hour": None,
+            "progress_at_tz": None,
+            "output_to": None,
+        },
+    ]

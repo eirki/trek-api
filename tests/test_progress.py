@@ -1,176 +1,373 @@
-import datetime as dt
+import typing as t
 
-from asyncpg import Connection
 import pendulum
+import pyarrow as pa
 from ward import test
 
-from tests.conftest import all_rows_in_table, connect_db
-from trek import crud
-from trek.progress.progress_utils import queries
+from tests.testing_utils import test_db
+from trek.core.progress import progress
+from trek.database import Database, trek_user_schema, user_schema, waypoint_schema
+from trek.models import Id, Leg, Location, Trek, TrekUser, User, Waypoint
 
 
-def example_waypoints(trek_id: int, leg_id: int) -> list[dict]:
+def example_waypoints(trek_id: Id, leg_id: Id) -> list[dict]:
     return [
         {
+            "id": "waypoint1",
             "trek_id": trek_id,
             "leg_id": leg_id,
-            "lat": 10.671114,
-            "lon": 59.332889,
-            "elevation": 18.35,
+            "lat": 0.1,
+            "lon": 0.0,
             "distance": 0.0,
         },
         {
+            "id": "waypoint2",
             "trek_id": trek_id,
             "leg_id": leg_id,
-            "lat": 10.671664,
-            "lon": 59.333243,
-            "elevation": 18.31,
-            "distance": 72.11886064837488,
+            "lat": 0.2,
+            "lon": 0.0,
+            "distance": 11057.43,
         },
         {
+            "id": "waypoint3",
             "trek_id": trek_id,
             "leg_id": leg_id,
-            "lat": 10.671857,
-            "lon": 59.333329,
-            "elevation": 18.32,
-            "distance": 95.44853837588332,
+            "lat": 0.3,
+            "lon": 0.0,
+            "distance": 22114.86,
         },
         {
+            "id": "waypoint4",
             "trek_id": trek_id,
             "leg_id": leg_id,
-            "lat": 10.672099,
-            "lon": 59.333292,
-            "elevation": 17.51,
-            "distance": 122.52108499023316,
+            "lat": 0.4,
+            "lon": 0.0,
+            "distance": 33172.29,
         },
     ]
 
 
-async def _preadd_users(db: Connection) -> list[int]:
-    sql = """insert into
-            user_ (is_admin)
-        values
-            (:is_admin);
-        """
-    await db.execute_many(sql, values=[{"is_admin": False}] * 3)
-    user_ids = await db.fetch_all("select id from user_")
-    assert len(user_ids) > 0
-    as_int = [user["id"] for user in user_ids]
-    assert all(isinstance(user_id, int) for user_id in as_int)
-    return as_int
+def _preadd_users(db: Database) -> list[Id]:
+    user_records = [{"id": db.make_id()} for _ in range(3)]
+    table = pa.Table.from_pylist(user_records, schema=user_schema)
+    db.save_table(User, table)
+    user_ids = [user["id"] for user in user_records]
+    return user_ids
 
 
-async def _preadd_treks(db: Connection, user_ids: list[int]) -> tuple[int, int]:
-    trek_record = await crud.queries.add_trek(
-        db, origin="testOrigin", owner_id=user_ids[0]
+def _preadd_treks(
+    db: Database, user_ids: list[Id], add_location=True, location_added_at=None
+) -> tuple[Id, Id]:
+    trek_id = db.make_id()
+    trek_record = {
+        "id": trek_id,
+        "is_active": True,
+        "owner_id": user_ids[0],
+        "progress_at_hour": 12,
+        "progress_at_tz": "UTC",
+    }
+    db.append_record(Trek, trek_record)
+
+    leg_id = db.make_id()
+    leg_record = {
+        "id": leg_id,
+        "trek_id": trek_id,
+        "destination": "testDestination",
+        "added_at": pendulum.datetime(2000, 2, 5, 12, 30, 5),
+        "added_by": user_ids[0],
+        "is_finished": False,
+    }
+    db.append_record(Leg, leg_record)
+
+    waypoint_records = example_waypoints(trek_id, leg_id)
+    waypoints_table = pa.Table.from_pylist(waypoint_records, schema=waypoint_schema)
+    db.save_table(Waypoint, waypoints_table)
+
+    if add_location:
+        location_record = {
+            "trek_id": trek_id,
+            "leg_id": leg_id,
+            "latest_waypoint": waypoint_records[1]["id"],
+            "added_at": location_added_at,
+            "address": "my_address",
+            "lat": 0.2,
+            "lon": 0.0,
+            "distance": 11057.43,
+        }
+        db.append_record(Location, location_record)
+
+    other_trek_id = db.make_id()
+    other_trek_record = {
+        "id": other_trek_id,
+        "is_active": True,
+        "owner_id": user_ids[1],
+        "progress_at_hour": 18,
+        "progress_at_tz": "UTC",
+    }
+    db.append_record(Trek, other_trek_record)
+    other_leg_id = db.make_id()
+    other_leg_record = {
+        "id": other_leg_id,
+        "trek_id": other_trek_id,
+        "destination": "testDestination",
+        "added_at": pendulum.datetime(2000, 2, 5, 12, 30, 5),
+        "added_by": user_ids[1],
+        "is_finished": False,
+    }
+    db.append_record(Leg, other_leg_record)
+    other_waypoint_records = example_waypoints(other_trek_id, other_leg_id)
+    other_waypoints_table = pa.Table.from_pylist(
+        other_waypoint_records, schema=waypoint_schema
     )
-    trek_id = trek_record["id"]
-    leg_record = await crud.queries.add_leg(
-        db,
-        trek_id=trek_id,
-        destination="testDestination",
-        added_at=pendulum.datetime(2015, 2, 5, 12, 30, 5),
-        added_by=user_ids[0],
-    )
-    leg_id = leg_record["id"]
-    await crud.queries.start_leg(db, id=leg_id)
+    db.save_table(Waypoint, other_waypoints_table)
 
-    waypoints = example_waypoints(trek_id, leg_id)
-    await crud.queries.add_waypoints(db, waypoints)
-
-    other_trek_record = await crud.queries.add_trek(
-        db, origin="testOrigin2", owner_id=user_ids[1]
-    )
-    other_trek_id = other_trek_record["id"]
-    await crud.queries.add_leg(
-        db,
-        trek_id=other_trek_id,
-        destination="testDestination2",
-        added_at=pendulum.datetime(2015, 2, 6, 12, 30, 5),
-        added_by=user_ids[1],
-    )
-
-    for user_id in user_ids[0:2]:
-        now = dt.datetime.fromtimestamp(pendulum.now().timestamp(), pendulum.tz.UTC)
-        await crud.queries.add_trek_user(
-            db, trek_id=trek_id, user_id=user_id, added_at=now
-        )
+    trek_user_records = [
+        {
+            "trek_id": trek_id,
+            "user_id": user_id,
+            "added_at": pendulum.datetime(2000, 2, 5, 12, 30, 5),
+        }
+        for user_id in user_ids[0:2]
+    ]
+    trek_users_table = pa.Table.from_pylist(trek_user_records, schema=trek_user_schema)
+    db.save_table(TrekUser, trek_users_table)
     return trek_id, leg_id
 
 
-@test("treks_to_update_1_days_since_last_20h")
-async def test_treks_to_update_1_days_since_last_20h(db=connect_db):
-    user_ids = await _preadd_users(db)
-    trek_id, leg_id = await _preadd_treks(db, user_ids)
-    await queries.add_location(
-        db,
-        trek_id=trek_id,
-        leg_id=leg_id,
-        visited_at=pendulum.date(2015, 2, 7),
-        address="my_address",
+@test("treks_to_update_1_days_since_last_update")
+def test_treks_to_update_1_days_since_last_update(db=test_db):
+    user_ids = _preadd_users(db)
+    trek_id, _ = _preadd_treks(
+        db, user_ids, location_added_at=pendulum.datetime(2000, 2, 4)
     )
-    now = dt.datetime(2015, 2, 9, 20, 0, 0)
-    res = await queries.treks_to_update(db, now=now)
+    date = pendulum.datetime(2000, 2, 5, hour=12)
+    res = list(progress._get_treks_to_update(db, date))
     assert len(res) == 1
-    exp = {
-        "trek_id": 1,
-        "leg_id": 1,
-        "most_recent_location_date": pendulum.date(2015, 2, 7),
-        "execute_yesterdays_progress": True,
+    trek, leg = res[0]
+    trek_exp = {
+        "id": "00000000000000000000000000000003",
+        "is_active": True,
+        "output_to": None,
+        "owner_id": "00000000000000000000000000000000",
+        "progress_at_hour": 12,
+        "progress_at_tz": "UTC",
     }
-    assert dict(res[0]) == exp
+
+    # pandas' to_records does not convert pandas.TimeStamp to dt.datetime
+    leg["added_at"] = pendulum.instance(leg["added_at"].to_pydatetime())  # type: ignore
+
+    leg_exp = {
+        "added_at": pendulum.datetime(2000, 2, 5, 12, 30, 5),
+        "added_by": "00000000000000000000000000000000",
+        "id": "00000000000000000000000000000004",
+        "is_finished": False,
+        "trek_id": "00000000000000000000000000000003",
+    }
+    assert trek == trek_exp
+    assert leg == leg_exp
 
 
-@test("treks_to_update_1_days_since_last_10h")
-async def test_treks_to_update_1_days_since_last_10h(db=connect_db):
-    user_ids = await _preadd_users(db)
-    trek_id, leg_id = await _preadd_treks(db, user_ids)
-    await queries.add_location(
-        db,
-        trek_id=trek_id,
-        leg_id=leg_id,
-        visited_at=pendulum.date(2015, 2, 7),
-        address="my_address",
+@test("treks_to_update_1_hour_since_last_update")
+def test_treks_to_update_1_hour_since_last_update(db=test_db):
+    user_ids = _preadd_users(db)
+    _preadd_treks(
+        db, user_ids, location_added_at=pendulum.datetime(2000, 2, 5, hour=11)
     )
-    now = dt.datetime(2015, 2, 9, 10, 0, 0)
-    res = await queries.treks_to_update(db, now=now)
-    assert res == []
+    date = pendulum.datetime(2000, 2, 5, hour=12)
+    res = list(progress._get_treks_to_update(db, date))
+    assert len(res) == 0
 
 
-@test("treks_to_update_0_days_since_last_20h")
-async def test_treks_to_update_0_days_since_last_20h(db=connect_db):
-    user_ids = await _preadd_users(db)
-    trek_id, leg_id = await _preadd_treks(db, user_ids)
-    await queries.add_location(
-        db,
-        trek_id=trek_id,
-        leg_id=leg_id,
-        visited_at=pendulum.date(2015, 2, 8),
-        address="my_address",
-    )
-    now = dt.datetime(2015, 2, 9, 20, 0, 0)
-    res = await queries.treks_to_update(db, now=now)
-    assert res == []
-
-
-@test("treks_to_update_2_days_since_last_10h")
-async def test_treks_to_update_2_days_since_last_10h(db=connect_db):
-    user_ids = await _preadd_users(db)
-    trek_id, leg_id = await _preadd_treks(db, user_ids)
-    await queries.add_location(
-        db,
-        trek_id=trek_id,
-        leg_id=leg_id,
-        visited_at=pendulum.date(2015, 2, 6),
-        address="my_address",
-    )
-    now = dt.datetime(2015, 2, 9, 10, 0, 0)
-    res = await queries.treks_to_update(db, now=now)
+@test("treks_to_update_no_locations")
+def test_treks_to_update_no_locations(db=test_db):
+    user_ids = _preadd_users(db)
+    trek_id, leg_id = _preadd_treks(db, user_ids, add_location=False)
+    date = pendulum.datetime(2000, 2, 5, hour=12)
+    res = list(progress._get_treks_to_update(db, date))
     assert len(res) == 1
-    exp = {
-        "trek_id": 1,
-        "leg_id": 1,
-        "most_recent_location_date": pendulum.date(2015, 2, 6),
-        "execute_yesterdays_progress": False,
+    assert len(res) == 1
+    trek, leg = res[0]
+    trek_exp = {
+        "id": trek_id,
+        "is_active": True,
+        "output_to": None,
+        "owner_id": "00000000000000000000000000000000",
+        "progress_at_hour": 12,
+        "progress_at_tz": "UTC",
     }
-    assert dict(res[0]) == exp
+    # pandas' to_records does not convert pandas.TimeStamp to dt.datetime
+    leg["added_at"] = pendulum.instance(leg["added_at"].to_pydatetime())  # type: ignore
+
+    leg_exp = {
+        "added_at": pendulum.datetime(2000, 2, 5, 12, 30, 5),
+        "added_by": "00000000000000000000000000000000",
+        "id": leg_id,
+        "is_finished": False,
+        "trek_id": "00000000000000000000000000000003",
+    }
+
+    assert trek == trek_exp
+    assert leg == leg_exp
+
+
+def fake_upload_func(*args, **kwargs):
+    return "upload_res"
+
+
+def fake_location_apis_func(*args, **kwargs):
+    return ("address", "country", "photo", "map_url", "poi")
+
+
+def fake_mapping_func(*args, **kwargs):
+    return "map_res"
+
+
+@test("execute_daily_progression_no_last_location")
+def test_execute_daily_progression_no_last_location(db=test_db):
+    user_ids = _preadd_users(db)
+    trek_id, leg_id = _preadd_treks(db, user_ids, add_location=False)
+    date = pendulum.datetime(2000, 2, 5, 12, 30, 5)
+    users_progress: t.Any = [
+        {"step": {"amount": 5000}},
+        {"step": {"amount": 5000}},
+        {"step": {"amount": 5000}},
+    ]
+    res = progress._execute_daily_progression(
+        db,
+        trek_id,
+        leg_id,
+        date,
+        users_progress,
+        fake_upload_func,
+        fake_location_apis_func,
+        fake_mapping_func,
+    )
+    assert res is not None
+    locaction, new_achievement = res
+    assert new_achievement is None
+    exp = {
+        "trek_id": "00000000000000000000000000000003",
+        "leg_id": "00000000000000000000000000000004",
+        "lat": 0.2017299,
+        "lon": 0.0,
+        "distance": 11250.0,  # distance is 15 000 * 0.75 (STRIDE)
+        "added_at": pendulum.datetime(2000, 2, 5, 12, 30, 5),
+        "is_last_in_leg": False,
+        "latest_waypoint": "waypoint2",
+        "address": "address",
+        "country": "country",
+        "is_new_country": False,
+        "gmap_url": "map_url",
+        "traversal_map_url": "map_res",
+        "poi": "poi",
+        "photo_url": "photo",
+        "achievements": None,
+        "factoid": None,
+    }
+    assert locaction == exp
+
+
+@test("execute_daily_progression")
+def test_execute_daily_progression(db=test_db):
+    user_ids = _preadd_users(db)
+    trek_id, leg_id = _preadd_treks(db, user_ids, add_location=True)
+    date = pendulum.datetime(2000, 2, 5, 12, 30, 5)
+    users_progress: t.Any = [
+        {"step": {"amount": 5000}},
+        {"step": {"amount": 5000}},
+        {"step": {"amount": 5000}},
+    ]
+    res = progress._execute_daily_progression(
+        db,
+        trek_id,
+        leg_id,
+        date,
+        users_progress,
+        fake_upload_func,
+        fake_location_apis_func,
+        fake_mapping_func,
+    )
+    assert res is not None
+    locaction, new_achievement = res
+    assert new_achievement is None
+
+    exp = {
+        "trek_id": "00000000000000000000000000000003",
+        "leg_id": "00000000000000000000000000000004",
+        "lat": 0.3017299,
+        "lon": 0.0,
+        "distance": 22307.43,
+        "added_at": pendulum.datetime(2000, 2, 5, 12, 30, 5),
+        "is_last_in_leg": False,
+        "latest_waypoint": "waypoint3",
+        "address": "address",
+        "country": "country",
+        "is_new_country": False,
+        "gmap_url": "map_url",
+        "traversal_map_url": "map_res",
+        "poi": "poi",
+        "photo_url": "photo",
+        "achievements": None,
+        "factoid": None,
+    }
+    assert locaction == exp
+
+
+# @test("treks_to_update_1_days_since_last_10h")
+# def test_treks_to_update_1_days_since_last_10h(db=test_db):
+#     user_ids = _preadd_users(db)
+#     trek_id, leg_id = _preadd_treks(db, user_ids)
+#     queries.add_location(
+#         db,
+#         trek_id=trek_id,
+#         leg_id=leg_id,
+#         added_at=pendulum.date(2000, 2, 7),
+#         address="my_address",
+#     )
+#     now = dt.datetime(2000, 2, 9, 10, 0, 0)
+#     res = queries.treks_to_update(db, now=now)
+#     assert res == []
+
+
+# @test("treks_to_update_0_days_since_last_20h")
+# def test_treks_to_update_0_days_since_last_20h(db=test_db):
+#     user_ids = _preadd_users(db)
+#     trek_id, leg_id = _preadd_treks(db, user_ids)
+#     queries.add_location(
+#         db,
+#         trek_id=trek_id,
+#         leg_id=leg_id,
+#         added_at=pendulum.date(2000, 2, 8),
+#         address="my_address",
+#     )
+#     now = dt.datetime(2000, 2, 9, 20, 0, 0)
+#     res = queries.treks_to_update(db, now=now)
+#     assert res == []
+
+
+# @test("treks_to_update_2_days_since_last_10h")
+# def test_treks_to_update_2_days_since_last_10h(db=test_db):
+#     user_ids = _preadd_users(db)
+#     trek_id, leg_id = _preadd_treks(db, user_ids)
+#     queries.add_location(
+#         db,
+#         trek_id=trek_id,
+#         leg_id=leg_id,
+#         added_at=pendulum.date(2000, 2, 6),
+#         address="my_address",
+#     )
+#     now = dt.datetime(2000, 2, 9, 10, 0, 0)
+#     res = queries.treks_to_update(db, now=now)
+#     assert len(res) == 1
+#     exp = {
+#         "trek_id": 1,
+#         "leg_id": 1,
+#         "most_recent_location_date": pendulum.date(2000, 2, 6),
+#         "execute_yesterdays_progress": False,
+#     }
+#     assert dict(res[0]) == exp
+
+
+# @test("treks_to_update_never_updated")
+# def test_treks_to_update_never_updated(db=test_db):
+#     ...

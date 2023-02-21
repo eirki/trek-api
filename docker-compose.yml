@@ -8,25 +8,22 @@ services:
     command: "just serve"
     ports:
       - "5007:5007"
-    networks:
-      - trekapi_network
-      - nginx_network
-    restart: always
-  trekapi_db:
-    container_name: trekapi_db
-    image: "postgres:13.3"
-    env_file: .env
-    command: -p 5433
-    ports:
-      - 5433:5433
     volumes:
-      - ~/trekapi-data:/var/lib/postgresql/data
+      - /var/lib/trekapi/data:/var/lib/trekapi/data
     networks:
-      - trekapi_network
+      - nginx_network
+
+  trekapi_scheduler:
+    container_name: trekapi_scheduler
+    build: .
+    env_file:
+      - .env
+    command: "just schedule"
+    volumes:
+      - /var/lib/trekapi/data:/var/lib/trekapi/data
     restart: always
 
 networks:
   nginx_network:
     external:
       name: nginx_default
-  trekapi_network: ~
