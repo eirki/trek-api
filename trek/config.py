@@ -13,6 +13,7 @@ max_route_distance: Final = 1_000_000
 
 tables_path: Final = Path(os.environ.get("trek_tables_path", "/var/lib/trekapi/data"))
 frontend_url: Final = os.environ["trek_frontend_url"]
+backend_url: Final = os.environ["trek_backend_url"]
 dbx_token: Final = os.environ["trek_dbx_token"]
 
 

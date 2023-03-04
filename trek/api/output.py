@@ -1,10 +1,11 @@
 import logging
 import typing as t  # noqa
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 from fastapi.responses import RedirectResponse
 from fastapi_jwt_auth import AuthJWT
 
+from trek import config
 from trek.core.output import discord
 from trek.database import Database
 from trek.models import Id
@@ -24,12 +25,13 @@ HANDLE_REDIRECT_ENDPOINT_NAME = "handle_discord_redirect"
 def make_discord_add_url(
     trek_id: Id,
     frontend_redirect_url: str,
-    request_obj: Request,
     db: Database = Depends(Database.get_db),
     Authorize: AuthJWT = Depends(),
 ) -> discord.UrlResponse:
     user_id = Authorize.get_jwt_subject()
-    backend_redirect_url = request_obj.url_for(HANDLE_REDIRECT_ENDPOINT_NAME)
+    backend_redirect_url = config.backend_url + router.url_path_for(
+        HANDLE_REDIRECT_ENDPOINT_NAME
+    )
     return discord.make_authorization_url(
         db=db,
         trek_id=trek_id,
