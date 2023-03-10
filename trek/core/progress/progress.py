@@ -250,17 +250,17 @@ def _execute_daily_progression(
     upload_func: UploadFunc,
     location_apis_func: LocationApisFunc,
     mapping_func: MappingFunc,
-) -> tuple[t.Optional[Location], t.Optional[list[Achievement]]]:
+) -> t.Optional[Location]:
     steps_today = sum(user["step"]["amount"] for user in users_progress)
     log.info(f"{steps_today=}")
     if steps_today == 0:
         log.info("No steps")
-        return None, None
+        return None
 
     last_location = _most_recent_location(db, trek_id=trek_id, leg_id=leg_id)
     if last_location and last_location["is_last_in_leg"]:
         log.info("Leg is finished")
-        return None, None
+        return None
     progress_before_today = last_location["distance"] if last_location else 0
 
     waypoints_table = _load_waypoints_table(db, trek_id=trek_id, leg_id=leg_id)
@@ -305,14 +305,6 @@ def _execute_daily_progression(
         if not is_finished
         else factoids.leg_summary(db, trek_id, leg_id)
     )
-    days_achievements = achievements.main(
-        db=db, trek_id=trek_id, leg_id=leg_id, date=date
-    )
-    days_achievements_ids = (
-        [achievement["id"] for achievement in days_achievements]
-        if days_achievements
-        else None
-    )
 
     location: Location = {
         "trek_id": trek_id,
@@ -330,10 +322,9 @@ def _execute_daily_progression(
         "poi": poi,
         "photo_url": photo,
         "traversal_map_url": traversal_map,
-        "achievements": days_achievements_ids,
         "factoid": factoid,
     }
-    return location, days_achievements
+    return location
 
 
 def _save_location_data(db: Database, record: Location):
@@ -367,7 +358,7 @@ def execute_one(
     )
     log.info(users_progress)
     _save_users_progress(db, users_progress)
-    location, new_achievements = _execute_daily_progression(
+    location = _execute_daily_progression(
         db=db,
         trek_id=trek_id,
         leg_id=leg_id,
@@ -380,7 +371,11 @@ def execute_one(
     if location is None:
         return
     _save_location_data(db, location)
+    new_achievements = achievements.main(
+        db=db, trek_id=trek_id, leg_id=leg_id, date=date
+    )
     if new_achievements:
+        log.info(new_achievements)
         _save_achievements_data(db, new_achievements)
     next_adder = None
     if location["is_last_in_leg"]:

@@ -1,6 +1,7 @@
 import typing as t
 import warnings
 
+import pandas as pd
 from pandas.errors import SettingWithCopyWarning
 import pendulum
 import pyarrow as pa
@@ -17,8 +18,10 @@ def _check_new_achivement(
         return None
     if not records[0]["taken_at"] == date:
         return None
-
-    return records[0], records[1]
+    new, old = records[0:2]
+    if pd.isna(new["amount"]) or pd.isna(old["amount"]):
+        return None
+    return new, old
 
 
 def _most_steps_one_day(

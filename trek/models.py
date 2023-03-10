@@ -103,7 +103,6 @@ class Location(t.TypedDict):
     photo_url: t.Optional[str]
     gmap_url: t.Optional[str]
     traversal_map_url: t.Optional[str]
-    achievements: t.Annotated[t.Optional[list[Id]], pa.list_(value_type=pa.string())]
     factoid: t.Optional[str]
 
 

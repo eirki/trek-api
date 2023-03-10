@@ -131,6 +131,17 @@ def test_most_steps_one_week(db: Database = test_db):
     }
 
 
+@test("most_steps_one_week_too_few_days ")
+def test_most_steps_one_week_too_few_days(db: Database = test_db):
+    date = pendulum.date(2000, 2, 5)
+    steps = [
+        (0, 2, 0),
+    ]
+    steps_table, trek_id, leg_id = _preadd_steps(db, steps, date)
+    res = achievements._most_steps_one_week(steps_table, date)
+    assert res is None
+
+
 @test("most_steps_one_week_no_record")
 def test_most_steps_one_week_no_record(db: Database = test_db):
     date = pendulum.date(2000, 2, 5)

@@ -243,8 +243,7 @@ def test_execute_daily_progression_no_last_location(db=test_db):
         fake_mapping_func,
     )
     assert res is not None
-    locaction, new_achievement = res
-    assert new_achievement is None
+    locaction = res
     exp = {
         "trek_id": "00000000000000000000000000000003",
         "leg_id": "00000000000000000000000000000004",
@@ -261,7 +260,6 @@ def test_execute_daily_progression_no_last_location(db=test_db):
         "traversal_map_url": "map_res",
         "poi": "poi",
         "photo_url": "photo",
-        "achievements": None,
         "factoid": None,
     }
     assert locaction == exp
@@ -288,8 +286,7 @@ def test_execute_daily_progression(db=test_db):
         fake_mapping_func,
     )
     assert res is not None
-    locaction, new_achievement = res
-    assert new_achievement is None
+    locaction = res
 
     exp = {
         "trek_id": "00000000000000000000000000000003",
@@ -307,7 +304,6 @@ def test_execute_daily_progression(db=test_db):
         "traversal_map_url": "map_res",
         "poi": "poi",
         "photo_url": "photo",
-        "achievements": None,
         "factoid": None,
     }
     assert locaction == exp

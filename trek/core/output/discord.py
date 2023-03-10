@@ -51,6 +51,10 @@ def handle_discord_redirect(db: Database, state, guild_id: int):
         "channel_id": channel_id,
     }
     db.upsert_record(DiscordChannel, channel, pc.field("trek_id") == pc.scalar(trek_id))
+    trek_record = db.load_records(Trek, filter=pc.field("id") == pc.scalar(trek_id))[0]
+    trek_record["output_to"] = "discord"
+    db.upsert_record(Trek, trek_record, pc.field("id") == pc.scalar(trek_id))
+
     frontend_redirect_url = state_params["frontend_redirect_url"]
     return frontend_redirect_url
 
