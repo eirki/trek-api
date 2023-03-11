@@ -76,9 +76,13 @@ class FitbitUser:
         entry = data["activities-steps"][0]
         return int(entry["value"]) if entry else 0
 
-    def user_name(self) -> str:
-        user_profile = self.client.user_profile_get()
-        return user_profile["user"]["firstName"]
+    def user_name(self) -> t.Optional[str]:
+        try:
+            user_profile = self.client.user_profile_get()
+            return user_profile["user"]["firstName"]
+        except Exception as e:
+            log.info(f"Failed to get user name: {e}", exc_info=True)
+            return None
 
 
 class FitbitService:
