@@ -352,7 +352,14 @@ def test_get(db=test_db):
     trek_record = response.dict()
     exp = {
         "can_add_leg": False,
-        "current_location": None,
+        "current_location": {
+            "distance": 0.0,
+            "id": "00000000000000000000000000000005",
+            "lat": 10.671114,
+            "leg_id": "00000000000000000000000000000004",
+            "lon": 59.332889,
+            "trek_id": "00000000000000000000000000000003",
+        },
         "is_active": False,
         "is_owner": True,
         "legs": [

@@ -176,7 +176,7 @@ def add_trek(
 class GetTrekResponse(BaseModel):
     users: list[str]
     legs: list[Leg]
-    current_location: t.Optional[Location]
+    current_location: t.Union[Waypoint, Location, None]
     is_owner: bool
     is_active: bool
     can_add_leg: bool
@@ -219,11 +219,13 @@ def get_trek(
     locations_table = db.load_table(
         Location, filter=pc.field("trek_id") == pc.scalar(trek_id)
     ).sort_by([("added_at", "descending")])
-    current_location = (
-        locations_table.slice(length=1).to_pylist()[0]
-        if locations_table.num_rows > 0
-        else None
-    )
+    if locations_table.num_rows > 0:
+        current_location = locations_table.slice(length=1).to_pylist()[0]
+    else:
+        waypoints_table = db.load_table(
+            Waypoint, filter=pc.field("trek_id") == pc.scalar(trek_id)
+        )
+        current_location = waypoints_table.slice(length=1).to_pylist()[0]
 
     res = GetTrekResponse(
         legs=leg_records,
