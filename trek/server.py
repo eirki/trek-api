@@ -63,8 +63,7 @@ def setup_exception_handlers(app):
     ):  # pragma: no cover
         model = exc.E901UnexpectedError(traceback=traceback.format_exc())
         log.error(
-            f"Unexpected error: {type(e).__name__}",
-            extra=_exception_data(model, tracebk=traceback.format_exc()),
+            f"Unexpected error: {type(e).__name__}, data:{_exception_data(model, tracebk=traceback.format_exc())}",
         )
         return JSONResponse(
             status_code=500,
@@ -73,8 +72,9 @@ def setup_exception_handlers(app):
 
     @app.exception_handler(exc.ServerException)
     async def server_exception_handler(request: Request, e: exc.ServerException):
+        extra = _exception_data(e.model, tracebk=traceback.format_exc())
         log.error(
-            f"Server error: {e.model.__class__.__name__}",
+            f"Server error: {e.model.__class__.__name__}, data:{extra}",
             extra=_exception_data(e.model, tracebk=traceback.format_exc()),
         )
         return JSONResponse(
@@ -136,6 +136,11 @@ def custom_openapi():  # pragma: no cover
 @router.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@router.get("/error")
+async def error():
+    raise exc.ServerException(exc.E101Error(status_code=403, detail="Forbidden"))
 
 
 def make_app() -> FastAPI:
