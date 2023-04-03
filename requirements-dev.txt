@@ -4,15 +4,17 @@
 #
 #    pip-compile requirements-dev.in
 #
-appdirs==1.4.4
-    # via black
+asttokens==2.2.1
+    # via
+    #   -c requirements.txt
+    #   stack-data
 backcall==0.2.0
-    # via ipython
-backports.entry-points-selectable==1.1.0
-    # via virtualenv
-black==21.7b0
+    # via
+    #   -c requirements.txt
+    #   ipython
+black==23.1.0
     # via -r requirements-dev.in
-cfgv==3.3.0
+cfgv==3.3.1
     # via pre-commit
 click==8.0.1
     # via
@@ -25,100 +27,143 @@ click-completion==0.5.2
     # via ward
 click-default-group==1.2.2
     # via ward
-commonmark==0.9.1
-    # via rich
-coverage==6.2
+comm==0.1.2
+    # via ipykernel
+coverage==7.2.1
     # via -r requirements-dev.in
 cucumber-tag-expressions==4.1.0
     # via ward
-debugpy==1.4.1
+debugpy==1.6.6
     # via ipykernel
-decorator==5.0.9
-    # via ipython
-distlib==0.3.2
+decorator==5.1.1
+    # via
+    #   -c requirements.txt
+    #   ipython
+distlib==0.3.6
     # via virtualenv
+executing==1.2.0
+    # via
+    #   -c requirements.txt
+    #   stack-data
 filelock==3.9.0
     # via
     #   -c requirements.txt
     #   virtualenv
-flake8==3.9.2
+flake8==6.0.0
     # via
     #   -r requirements-dev.in
     #   flake8-debugger
     #   flake8-print
-flake8-debugger==4.0.0
+flake8-debugger==4.1.2
     # via -r requirements-dev.in
 flake8-fixme==1.1.1
     # via -r requirements-dev.in
-flake8-print==4.0.0
+flake8-print==5.0.0
     # via -r requirements-dev.in
-freezegun==1.1.0
+freezegun==1.2.2
     # via -r requirements-dev.in
-identify==2.2.11
+identify==2.5.19
     # via pre-commit
-ipykernel==6.0.3
-    # via -r requirements-dev.in
-ipython==7.26.0
-    # via ipykernel
-ipython-genutils==0.2.0
-    # via traitlets
-isort==5.9.3
-    # via -r requirements-dev.in
-jedi==0.18.0
-    # via ipython
-jinja2==3.0.1
-    # via click-completion
-jupyter-client==6.1.12
-    # via ipykernel
-jupyter-core==4.7.1
+importlib-metadata==6.0.0
     # via jupyter-client
-markupsafe==2.0.1
-    # via jinja2
-matplotlib-inline==0.1.2
+ipykernel==6.21.3
+    # via -r requirements-dev.in
+ipython==8.11.0
+    # via
+    #   -c requirements.txt
+    #   ipykernel
+isort==5.12.0
+    # via -r requirements-dev.in
+jedi==0.18.2
+    # via
+    #   -c requirements.txt
+    #   ipython
+jinja2==3.1.2
+    # via click-completion
+jupyter-client==8.0.3
+    # via ipykernel
+jupyter-core==5.2.0
     # via
     #   ipykernel
+    #   jupyter-client
+markdown-it-py==2.2.0
+    # via rich
+markupsafe==2.1.2
+    # via jinja2
+matplotlib-inline==0.1.6
+    # via
+    #   -c requirements.txt
+    #   ipykernel
     #   ipython
-mccabe==0.6.1
+mccabe==0.7.0
     # via flake8
-mypy==0.991
+mdurl==0.1.2
+    # via markdown-it-py
+mypy==1.1.1
     # via -r requirements-dev.in
-mypy-extensions==0.4.3
+mypy-extensions==1.0.0
     # via
     #   black
     #   mypy
 nest-asyncio==1.5.6
-    # via -r requirements-dev.in
-nodeenv==1.6.0
+    # via
+    #   -r requirements-dev.in
+    #   ipykernel
+nodeenv==1.7.0
     # via pre-commit
-parso==0.8.2
-    # via jedi
-pathspec==0.9.0
+packaging==23.0
+    # via
+    #   black
+    #   ipykernel
+parso==0.8.3
+    # via
+    #   -c requirements.txt
+    #   jedi
+pathspec==0.11.0
     # via black
 pexpect==4.8.0
-    # via ipython
+    # via
+    #   -c requirements.txt
+    #   ipython
 pickleshare==0.7.5
-    # via ipython
-platformdirs==2.2.0
-    # via virtualenv
-pluggy==0.13.1
+    # via
+    #   -c requirements.txt
+    #   ipython
+platformdirs==3.1.1
+    # via
+    #   black
+    #   jupyter-core
+    #   virtualenv
+pluggy==1.0.0
     # via ward
 pprintpp==0.4.0
     # via ward
-pre-commit==2.13.0
+pre-commit==3.1.1
     # via -r requirements-dev.in
-prompt-toolkit==3.0.19
-    # via ipython
+prompt-toolkit==3.0.38
+    # via
+    #   -c requirements.txt
+    #   ipython
+psutil==5.9.4
+    # via ipykernel
 ptyprocess==0.7.0
-    # via pexpect
-pycodestyle==2.7.0
+    # via
+    #   -c requirements.txt
+    #   pexpect
+pure-eval==0.2.2
+    # via
+    #   -c requirements.txt
+    #   stack-data
+pycodestyle==2.10.0
     # via
     #   flake8
     #   flake8-debugger
     #   flake8-print
-pyflakes==2.3.1
+pyflakes==3.0.1
     # via flake8
-pygments==2.9.0
+pygments==2.14.0
     # via
+    #   -c requirements.txt
     #   ipython
     #   rich
 python-dateutil==2.8.2
@@ -126,58 +171,66 @@ python-dateutil==2.8.2
     #   -c requirements.txt
     #   freezegun
     #   jupyter-client
-pyyaml==5.4.1
+pyyaml==6.0
     # via
     #   pre-commit
     #   relint
-pyzmq==22.1.0
-    # via jupyter-client
-regex==2021.8.3
-    # via black
-relint==1.2.1
+pyzmq==25.0.0
+    # via
+    #   ipykernel
+    #   jupyter-client
+relint==3.0.0
     # via -r requirements-dev.in
-rich==12.6.0
-    # via ward
-shellingham==1.4.0
+rich==13.3.2
+    # via
+    #   relint
+    #   ward
+shellingham==1.5.0.post1
     # via click-completion
 six==1.16.0
     # via
     #   -c requirements.txt
     #   click-completion
-    #   flake8-debugger
-    #   flake8-print
     #   python-dateutil
-    #   virtualenv
-toml==0.10.2
-    # via pre-commit
-tomli==1.2.0
+stack-data==0.6.2
+    # via
+    #   -c requirements.txt
+    #   ipython
+tomli==2.0.1
     # via
     #   black
     #   mypy
     #   ward
-tornado==6.1
+tornado==6.2
     # via
     #   ipykernel
     #   jupyter-client
-traitlets==5.0.5
+traitlets==5.9.0
     # via
+    #   -c requirements.txt
+    #   comm
     #   ipykernel
     #   ipython
     #   jupyter-client
     #   jupyter-core
     #   matplotlib-inline
-types-freezegun==1.1.0
+types-freezegun==1.1.10
     # via -r requirements-dev.in
 typing-extensions==4.4.0
     # via
     #   -c requirements.txt
+    #   black
     #   mypy
-virtualenv==20.7.0
+virtualenv==20.20.0
     # via pre-commit
-ward==0.67.0b0
+ward==0.67.2b0
     # via -r requirements-dev.in
-wcwidth==0.2.5
-    # via prompt-toolkit
+wcwidth==0.2.6
+    # via
+    #   -c requirements.txt
+    #   prompt-toolkit
+zipp==3.15.0
+    # via importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools
