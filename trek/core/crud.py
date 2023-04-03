@@ -316,7 +316,7 @@ def _assert_waypoints_connect(
             & (pc.field("leg_id") == pc.scalar(prev_leg_id))
         ),
     )
-    last_loc_record = prev_leg_waypoints_table.sort_by("distance").to_pylist()[0]
+    last_loc_record = prev_leg_waypoints_table.sort_by("distance").to_pylist()[-1]
     last_loc_tuple = (int(last_loc_record["lat"]), int(last_loc_record["lon"]))
     first_loc = waypoints[0]
     first_loc_tuple = (int(first_loc[0]), int(first_loc[1]))
