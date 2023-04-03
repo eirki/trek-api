@@ -1,3 +1,4 @@
+import logging
 import typing as t
 import warnings
 
@@ -10,6 +11,8 @@ import pyarrow.compute as pc
 from trek.database import Database
 from trek.models import Achievement, Id, Step
 
+log = logging.getLogger(__name__)
+
 
 def _check_new_achivement(
     records: list[Step], date: pendulum.Date
@@ -17,6 +20,8 @@ def _check_new_achivement(
     if not records:
         return None
     if not records[0]["taken_at"] == date:
+        return None
+    if len(records) < 2:
         return None
     new, old = records[0:2]
     if pd.isna(new["amount"]) or pd.isna(old["amount"]):
@@ -111,17 +116,22 @@ def main(
     achievements: list[Achievement] = []
     for table, is_for_trek in check_for:
         for ach_type, func, description, unit in possible_achievements:
-            res = func(table, date)
+            try:
+                res = func(table, date)
+            except Exception:
+                log.error(
+                    f"Error getting checking achievement {ach_type}", exc_info=True
+                )
             if res is None:
                 continue
             new, old = res
             new_achievement: Achievement = {
                 "id": db.make_id(),
                 "added_at": new["taken_at"],
-                "amount": new["amount"],
+                "amount": int(new["amount"]),
                 "user_id": new["user_id"],
                 "old_added_at": old["taken_at"],
-                "old_amount": old["amount"],
+                "old_amount": int(old["amount"]),
                 "old_user_id": old["user_id"],
                 "is_for_trek": is_for_trek,
                 "achievement_type": ach_type,
