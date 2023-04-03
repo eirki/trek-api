@@ -162,8 +162,11 @@ def _format_achivement(
 ) -> str:
     user = user_for_user_id[achievement["user_id"]]
     old_user = user_for_user_id[achievement["old_user_id"]]
+    scope_description = (
+        "denne etappen" if not achievement["is_for_trek"] else "for hele reisen"
+    )
     formatted = (
-        f"{user['name']} {{achievement}} har satt ny rekord: {achievement['description']}, med {achievement['amount']} {achievement['unit']}! "
+        f"{user['name']} {{achievement}} har satt ny rekord {scope_description}: {achievement['description']}, med {achievement['amount']} {achievement['unit']}! "
         f"Forrige record holder var {old_user['name']}, med {achievement['old_amount']} {achievement['unit']}. Huzzah!"
     )
     return formatted
@@ -187,7 +190,6 @@ def _format_output(
     most_steps = users_progress[0]["step"]["amount"]
     fewest_steps = users_progress[-1]["step"]["amount"]
     for i, row in enumerate(users_progress):
-
         steps = row["step"]["amount"]
         name = row["user"]["name"]
         user_distance = round_meters(steps * STRIDE)
