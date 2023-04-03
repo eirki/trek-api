@@ -115,7 +115,7 @@ def _get_steps_for_single_user(
         log.info("could not find token for user")
         return 0
     try:
-        user = Service.User(
+        tracker_user = Service.User(
             db=db,
             user_id=user_record["id"],
             token=json.loads(token_record["token"]),
@@ -123,7 +123,7 @@ def _get_steps_for_single_user(
     except Exception as e:
         log.info(f"Failed to authenticate tracker user: {e}")
         return 0
-    steps = user.steps(date, db)
+    steps = tracker_user.steps(date, db)
     return steps
 
 
