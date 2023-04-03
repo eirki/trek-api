@@ -136,7 +136,9 @@ def poi_for_location(
         return None, None
     name = place["name"]
     try:
-        photo_data = next(p for p in place["photos"] if p["width"] >= 1000)
+        photo_data = next(
+            p for p in place.get("photos", []) if p.get("width", 0) >= 1000
+        )
         ref = photo_data["photo_reference"]
         photo_itr = gmaps.places_photo(ref, max_width=2000)
         photo = b"".join([chunk for chunk in photo_itr if chunk])
