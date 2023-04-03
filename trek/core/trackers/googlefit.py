@@ -1,3 +1,4 @@
+import logging
 import typing as t  # noqa
 
 import google.auth
@@ -17,6 +18,8 @@ scopes = [
 ]
 
 GoogleFitToken = dict
+
+log = logging.getLogger(__name__)
 
 
 class GooglefitUser:
@@ -79,9 +82,6 @@ class GooglefitUser:
         except IndexError:
             return 0
 
-    def body(self, date: pendulum.Date):
-        pass
-
     def user_name(self) -> str:
         user_info = _get_user_info(self.credentials)
         return user_info["email"]
@@ -110,7 +110,7 @@ class GooglefitService:
 
     def authorization_url(self) -> str:
         authorization_url, state = self.client.authorization_url(
-            access_type="offline", include_granted_scopes="true"
+            access_type="offline", include_granted_scopes="true", prompt="consent"
         )
         return authorization_url
 
