@@ -99,6 +99,35 @@ possible_achievements = [
 ]
 
 
+def get_achievements_for_scope(
+    db: Database, table: pa.Table, date: pendulum.Date, is_for_trek: bool
+) -> list[Achievement]:
+    achievements: list[Achievement] = []
+    for ach_type, func, description, unit in possible_achievements:
+        try:
+            res = func(table, date)
+        except Exception:
+            log.error(f"Error getting checking achievement {ach_type}", exc_info=True)
+        if res is None:
+            continue
+        new, old = res
+        new_achievement: Achievement = {
+            "id": db.make_id(),
+            "added_at": new["taken_at"],
+            "amount": int(new["amount"]),
+            "user_id": new["user_id"],
+            "old_added_at": old["taken_at"],
+            "old_amount": int(old["amount"]),
+            "old_user_id": old["user_id"],
+            "is_for_trek": is_for_trek,
+            "achievement_type": ach_type,
+            "description": description,
+            "unit": unit,
+        }
+        achievements.append(new_achievement)
+    return achievements
+
+
 def main(
     db: Database, trek_id: Id, leg_id: Id, date: pendulum.Date
 ) -> t.Optional[list[Achievement]]:
@@ -106,37 +135,12 @@ def main(
     n_days_in_trek = pc.count_distinct(trek_steps.column("taken_at")).as_py()
     if n_days_in_trek < 3:
         return None
-    check_for = [(trek_steps, True)]
-
-    leg_steps = trek_steps.filter(pc.field("leg_id") == pc.scalar(leg_id))
-    n_days_in_leg = pc.count_distinct(leg_steps.column("taken_at")).as_py()
-    if n_days_in_leg < 3:
-        check_for.append((leg_steps, False))
-
-    achievements: list[Achievement] = []
-    for table, is_for_trek in check_for:
-        for ach_type, func, description, unit in possible_achievements:
-            try:
-                res = func(table, date)
-            except Exception:
-                log.error(
-                    f"Error getting checking achievement {ach_type}", exc_info=True
-                )
-            if res is None:
-                continue
-            new, old = res
-            new_achievement: Achievement = {
-                "id": db.make_id(),
-                "added_at": new["taken_at"],
-                "amount": int(new["amount"]),
-                "user_id": new["user_id"],
-                "old_added_at": old["taken_at"],
-                "old_amount": int(old["amount"]),
-                "old_user_id": old["user_id"],
-                "is_for_trek": is_for_trek,
-                "achievement_type": ach_type,
-                "description": description,
-                "unit": unit,
-            }
-            achievements.append(new_achievement)
+    achievements = get_achievements_for_scope(db, trek_steps, date, is_for_trek=True)
+    if not achievements:
+        leg_steps = trek_steps.filter(pc.field("leg_id") == pc.scalar(leg_id))
+        n_days_in_leg = pc.count_distinct(leg_steps.column("taken_at")).as_py()
+        if n_days_in_leg > 3:
+            achievements = get_achievements_for_scope(
+                db, leg_steps, date, is_for_trek=False
+            )
     return achievements
