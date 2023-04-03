@@ -20,8 +20,6 @@ geopy
 aiofiles
 gpxpy
 schedule
-azure-identity
-azure-storage-blob
 Pillow
 staticmap
 googlemaps
